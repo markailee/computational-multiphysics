@@ -1,0 +1,2 @@
+time,iterations,velocity_change,pressure_change,max_cell_imbalance,net_boundary_flux,converged
+0.000000000000e+00,333,1.993811426229e-06,9.353132517153e-07,2.320366121467e-14,-9.547918011776e-15,1

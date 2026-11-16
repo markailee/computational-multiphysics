@@ -1,0 +1,26 @@
+mesh = mesh/cavity.msh
+output = results/cavity.plt
+
+time_scheme = steady
+density = 1.0
+viscosity = 0.01
+gradient = least_squares
+convection_blending = 1.0
+
+velocity_relaxation = 0.7
+pressure_relaxation = 0.3
+maximum_iterations = 3000
+tolerance = 1.0e-6
+continuity_tolerance = 1.0e-8
+linear_tolerance = 1.0e-9
+linear_absolute_tolerance = 1.0e-12
+maximum_linear_iterations = 1000
+log_interval = 25
+
+[boundary.top]
+velocity = fixedValue 1 0
+pressure = zeroGradient
+
+[boundary.walls]
+velocity = noSlip
+pressure = zeroGradient

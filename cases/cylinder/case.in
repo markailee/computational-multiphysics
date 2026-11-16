@@ -1,0 +1,34 @@
+mesh = mesh/cylinder.msh
+output = results/cylinder.plt
+
+time_scheme = steady
+density = 1.0
+viscosity = 0.025
+gradient = least_squares
+convection_blending = 1.0
+
+velocity_relaxation = 0.5
+pressure_relaxation = 0.2
+maximum_iterations = 4000
+tolerance = 2.0e-6
+continuity_tolerance = 1.0e-8
+linear_tolerance = 1.0e-9
+linear_absolute_tolerance = 1.0e-12
+maximum_linear_iterations = 1000
+log_interval = 25
+
+[boundary.inlet]
+velocity = fixedValue 1 0
+pressure = zeroGradient
+
+[boundary.outlet]
+velocity = zeroGradient
+pressure = fixedValue 0
+
+[boundary.topBottom]
+velocity = fixedValue 1 0
+pressure = zeroGradient
+
+[boundary.cylinder]
+velocity = noSlip
+pressure = zeroGradient
