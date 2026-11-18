@@ -1,4 +1,4 @@
-PETSC_DIR ?= /home/lwa/program/petsc-3.26.0
+PETSC_DIR ?= /home/lwa/program/petsc-3.21.0
 include $(PETSC_DIR)/lib/petsc/conf/variables
 
 CXX := mpic++
@@ -11,7 +11,7 @@ PROJECT_FLAGS := -std=c++17 -O3 -Wall -Wextra -Wpedantic -Isrc -I$(PETSC_DIR)/in
 
 PYTHON ?= python3
 
-.PHONY: all clean meshes validate
+.PHONY: all clean meshes validate validate-turbulence
 all: $(TARGET)
 
 meshes:
@@ -22,6 +22,10 @@ validate: $(TARGET)
 	./$(TARGET) cases/backstep
 	./$(TARGET) cases/cylinder
 	$(PYTHON) cases/validate.py
+	$(PYTHON) cases/validate_turbulence.py --run
+
+validate-turbulence: $(TARGET)
+	$(PYTHON) cases/validate_turbulence.py --run
 
 $(TARGET): $(OBJECTS)
 	$(CXX) $(OBJECTS) -o $@ $(PETSC_KSP_LIB)

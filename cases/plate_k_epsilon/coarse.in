@@ -1,0 +1,48 @@
+mesh = mesh/plate_coarse.msh
+output = results/plate_k_epsilon_coarse.plt
+time_scheme = steady
+density = 1.0
+viscosity = 2.0e-7
+turbulence_model = k_epsilon
+initial_velocity = 1 0
+initial_k = 1.5e-4
+initial_epsilon = 1.125
+gradient = least_squares
+convection_blending = 0.0
+turbulence_convection_blending = 0.0
+velocity_relaxation = 0.5
+pressure_relaxation = 0.2
+turbulence_relaxation = 0.3
+maximum_iterations = 5000
+tolerance = 2.0e-6
+turbulence_tolerance = 2.0e-6
+continuity_tolerance = 1.0e-8
+linear_tolerance = 1.0e-9
+linear_absolute_tolerance = 1.0e-12
+maximum_linear_iterations = 1000
+log_interval = 100
+[boundary.inlet]
+velocity = fixedValue 1 0
+pressure = zeroGradient
+k = fixedValue 1.5e-4
+epsilon = fixedValue 1.125
+[boundary.outlet]
+velocity = zeroGradient
+pressure = fixedValue 0
+k = zeroGradient
+epsilon = zeroGradient
+[boundary.farfield]
+velocity = slip
+pressure = zeroGradient
+k = zeroGradient
+epsilon = zeroGradient
+[boundary.symmetry]
+velocity = slip
+pressure = zeroGradient
+k = zeroGradient
+epsilon = zeroGradient
+[boundary.plate]
+velocity = noSlip
+pressure = zeroGradient
+k = zeroGradient
+epsilon = wallFunction

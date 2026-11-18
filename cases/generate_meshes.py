@@ -80,6 +80,55 @@ def linspace(start, end, count):
     return [start + (end - start) * i / count for i in range(count + 1)]
 
 
+def stretched_nodes(length, count, first_height):
+    if count == 1:
+        return [0.0, length]
+    if first_height * count >= length:
+        return linspace(0.0, length, count)
+    low, high = 1.0, 2.0
+    for _ in range(100):
+        ratio = (low + high) / 2
+        total = first_height * (ratio ** count - 1) / (ratio - 1)
+        if total < length:
+            low = ratio
+        else:
+            high = ratio
+    ratio = (low + high) / 2
+    nodes = [0.0]
+    for i in range(count):
+        nodes.append(nodes[-1] + first_height * ratio ** i)
+    nodes[-1] = length
+    return nodes
+
+
+def double_stretched_nodes(length, count, first_height):
+    if count % 2:
+        raise ValueError("Double-sided stretching requires an even cell count")
+    lower = stretched_nodes(length / 2, count // 2, first_height)
+    return lower + [length - value for value in reversed(lower[:-1])]
+
+
+def quad_regions(regions):
+    nodes = []
+    lookup = {}
+    cells = []
+
+    def node(x, y):
+        key = (round(x, 12), round(y, 12))
+        if key not in lookup:
+            lookup[key] = len(nodes)
+            nodes.append((x, y))
+        return lookup[key]
+
+    for grid in regions:
+        indices = [[node(x, y) for x, y in row] for row in grid]
+        for j in range(len(grid) - 1):
+            for i in range(len(grid[0]) - 1):
+                cells.append((indices[j][i], indices[j][i + 1],
+                              indices[j + 1][i + 1], indices[j + 1][i]))
+    return nodes, cells
+
+
 def cavity():
     nodes, cells = triangulate_regions([(linspace(0.0, 1.0, 40), linspace(0.0, 1.0, 40))])
     patches = defaultdict(list)
@@ -154,7 +203,81 @@ def cylinder():
     write_msh(ROOT / "cylinder" / "mesh" / "cylinder.msh", nodes, cells, patches)
 
 
+def plate_mesh(case, level, nx, ny, upstream, y_plus):
+    viscosity = 2.0e-7
+    first_height = 2.0 * y_plus * viscosity / 0.04
+    xs = linspace(-0.33, 0.0, upstream) + [2.0 * (i / nx) ** 1.25 for i in range(1, nx + 1)]
+    ys = stretched_nodes(1.0, ny, first_height)
+    grid = [[(x, y) for x in xs] for y in ys]
+    nodes, cells = quad_regions([grid])
+    patches = defaultdict(list)
+    for a, b in boundary_edges(cells):
+        x = (nodes[a][0] + nodes[b][0]) / 2
+        y = (nodes[a][1] + nodes[b][1]) / 2
+        if abs(x + 0.33) < 1e-10:
+            name = "inlet"
+        elif abs(x - 2.0) < 1e-10:
+            name = "outlet"
+        elif abs(y - 1.0) < 1e-10:
+            name = "farfield"
+        elif abs(y) < 1e-10 and x < 0:
+            name = "symmetry"
+        else:
+            name = "plate"
+        patches[name].append((a, b))
+    write_msh(ROOT / case / "mesh" / f"plate_{level}.msh", nodes, cells, patches)
+
+
+def elbow_mesh(case, level, nx, nt, nz, ny, y_plus):
+    radius = 2.8
+    viscosity = 1.0 / 43000.0
+    first_height = 2.0 * y_plus * viscosity / 0.05
+    cross = double_stretched_nodes(1.0, ny, first_height)
+    radii = [radius - 0.5 + value for value in cross]
+    xs = linspace(-5.0, 0.0, nx)
+    upstream = [[(x, 0.5 - (r - radius + 0.5)) for x in xs] for r in radii]
+    angles = linspace(0.0, pi / 2, nt)
+    bend = [[(r * sin(angle), radius - r * cos(angle)) for angle in angles] for r in radii]
+    ys = linspace(radius, radius + 10.0, nz)
+    downstream = [[(r, y) for y in ys] for r in radii]
+    nodes, cells = quad_regions([upstream, bend, downstream])
+    patches = defaultdict(list)
+    for a, b in boundary_edges(cells):
+        x = (nodes[a][0] + nodes[b][0]) / 2
+        y = (nodes[a][1] + nodes[b][1]) / 2
+        if abs(x + 5.0) < 1e-10:
+            name = "inlet"
+        elif abs(y - (radius + 10.0)) < 1e-10:
+            name = "outlet"
+        else:
+            name = "walls"
+        patches[name].append((a, b))
+    write_msh(ROOT / case / "mesh" / f"elbow_{level}.msh", nodes, cells, patches)
+
+
+def turbulence_meshes():
+    plate_levels = {
+        "coarse": (80, 50, 10),
+        "medium": (120, 70, 14),
+        "fine": (180, 100, 20),
+    }
+    elbow_levels = {
+        "coarse": (25, 45, 40, 36),
+        "medium": (40, 70, 60, 50),
+        "fine": (60, 100, 80, 70),
+    }
+    wall_y_plus = {"coarse": 80.0, "medium": 50.0, "fine": 30.0}
+    sst_y_plus = {"coarse": 2.0, "medium": 1.0, "fine": 0.5}
+    for case, y_values in (("plate_k_epsilon", wall_y_plus), ("plate_sst_k_omega", sst_y_plus)):
+        for level, (nx, ny, upstream) in plate_levels.items():
+            plate_mesh(case, level, nx, ny, upstream, y_values[level])
+    for case, y_values in (("elbow_k_epsilon", wall_y_plus), ("elbow_sst_k_omega", sst_y_plus)):
+        for level, (nx, nt, nz, ny) in elbow_levels.items():
+            elbow_mesh(case, level, nx, nt, nz, ny, y_values[level])
+
+
 if __name__ == "__main__":
     cavity()
     backstep()
     cylinder()
+    turbulence_meshes()

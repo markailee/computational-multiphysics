@@ -1,0 +1,48 @@
+mesh = mesh/plate_coarse.msh
+output = results/plate_sst_k_omega_coarse.plt
+time_scheme = steady
+density = 1.0
+viscosity = 2.0e-7
+turbulence_model = sst_k_omega
+initial_velocity = 1 0
+initial_k = 2.2815e-7
+initial_omega = 126.75
+gradient = least_squares
+convection_blending = 0.0
+turbulence_convection_blending = 0.0
+velocity_relaxation = 0.5
+pressure_relaxation = 0.2
+turbulence_relaxation = 0.3
+maximum_iterations = 5000
+tolerance = 2.0e-6
+turbulence_tolerance = 2.0e-6
+continuity_tolerance = 1.0e-8
+linear_tolerance = 1.0e-9
+linear_absolute_tolerance = 1.0e-12
+maximum_linear_iterations = 1000
+log_interval = 100
+[boundary.inlet]
+velocity = fixedValue 1 0
+pressure = zeroGradient
+k = fixedValue 2.2815e-7
+omega = fixedValue 126.75
+[boundary.outlet]
+velocity = zeroGradient
+pressure = fixedValue 0
+k = zeroGradient
+omega = zeroGradient
+[boundary.farfield]
+velocity = slip
+pressure = zeroGradient
+k = zeroGradient
+omega = zeroGradient
+[boundary.symmetry]
+velocity = slip
+pressure = zeroGradient
+k = zeroGradient
+omega = zeroGradient
+[boundary.plate]
+velocity = noSlip
+pressure = zeroGradient
+k = fixedValue 0
+omega = wallFunction

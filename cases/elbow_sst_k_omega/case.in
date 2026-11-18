@@ -1,0 +1,38 @@
+mesh = mesh/elbow_medium.msh
+output = results/elbow_sst_k_omega.plt
+time_scheme = steady
+density = 1.0
+viscosity = 2.325581395348837e-5
+turbulence_model = sst_k_omega
+initial_velocity = 1 0
+initial_k = 0.00375
+initial_omega = 1.598
+gradient = least_squares
+convection_blending = 0.0
+turbulence_convection_blending = 0.0
+velocity_relaxation = 0.4
+pressure_relaxation = 0.15
+turbulence_relaxation = 0.3
+maximum_iterations = 6000
+tolerance = 2.0e-6
+turbulence_tolerance = 2.0e-6
+continuity_tolerance = 1.0e-8
+linear_tolerance = 1.0e-9
+linear_absolute_tolerance = 1.0e-12
+maximum_linear_iterations = 1000
+log_interval = 100
+[boundary.inlet]
+velocity = fixedValue 1 0
+pressure = zeroGradient
+k = fixedValue 0.00375
+omega = fixedValue 1.598
+[boundary.outlet]
+velocity = zeroGradient
+pressure = fixedValue 0
+k = zeroGradient
+omega = zeroGradient
+[boundary.walls]
+velocity = noSlip
+pressure = zeroGradient
+k = fixedValue 0
+omega = wallFunction

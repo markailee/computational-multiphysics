@@ -64,6 +64,10 @@ The code under `src/flow/` implements:
 - Fixed-value and zero-gradient pressure boundaries.
 - Automatic pressure-reference fixing when all pressure boundaries are Neumann conditions.
 - Optional steady or transient calculations and a spatially uniform body force.
+- Standard high-Reynolds-number \(k\)-\(\varepsilon\) turbulence with logarithmic-law wall functions.
+- Menter SST-2003 \(k\)-\(\omega\) turbulence with strain-based eddy-viscosity limiting and low-\(y^+\) wall integration.
+- Conservative transport of turbulence variables with bounded implicit upwind convection and optional deferred correction.
+- Turbulence fields, wall shear, friction velocity, and \(y^+\) diagnostics in Tecplot and CSV output.
 
 ## Numerical formulation
 
@@ -151,7 +155,109 @@ Default linear-solver choices are:
 | Momentum | `bcgs` | `ilu` |
 | Pressure correction | `cg` | `icc` |
 
-They can be changed in `case.in`. Standard PETSc command-line options are also passed through the solver initialization.
+They can be changed in `case.in`. Standard PETSc command-line options are also passed through the solver initialization. Turbulence equations default to `bcgs` with `ilu`.
+
+### RANS equations and eddy viscosity
+
+With `turbulence_model` different from `laminar`, the solver uses the Reynolds-averaged Navier–Stokes equations. The Boussinesq closure is
+
+$$
+-\rho\overline{u_i'u_j'}=2\mu_t\left(S_{ij}-\frac13S_{kk}\delta_{ij}\right)-\frac23\rho k\delta_{ij}.
+$$
+
+Momentum assembly uses \(\mu+\mu_t\) in the normal diffusion operator and includes the variable-\(\mu_t\) transpose-stress correction. The isotropic \(-2\rho k/3\) gradient is assembled explicitly with the current turbulent kinetic energy, so `p` remains static pressure rather than modified pressure. Production uses the full strain expression; no curvature or rotation correction is applied.
+
+Each SIMPLE outer iteration solves momentum, pressure correction, \(k\), and the selected turbulence scale equation sequentially. Turbulence source terms and eddy viscosity are frozen within each linear solve and updated between outer iterations. Turbulence equations support the same steady, backward-Euler, and BDF2 time histories as momentum.
+
+### Standard \(k\)-\(\varepsilon\) with wall functions
+
+The standard model solves
+
+$$
+\mu_t=C_\mu\rho k^2/\varepsilon,\qquad C_\mu=0.09,\quad C_{\varepsilon1}=1.44,\quad
+C_{\varepsilon2}=1.92,\quad \sigma_k=1.0,\quad \sigma_\varepsilon=1.3.
+$$
+
+At a no-slip wall, tangential momentum diffusion is replaced by wall-function shear. With \(u_\tau=C_\mu^{1/4}\sqrt{k_P}\), the implementation uses the molecular relation below \(y^+=11.53\) and
+
+$$
+U^+=\frac1\kappa\ln(Ey^+),\qquad \kappa=0.41,\quad E=9.8,
+$$
+
+above it. The near-wall kinetic-energy equation has zero normal gradient, consistent wall production, and the equilibrium value
+
+$$
+\varepsilon_P=\frac{C_\mu^{3/4}k_P^{3/2}}{\kappa y_P}.
+$$
+
+The nonzero wall-cell constraint is eliminated with its value retained in neighboring right-hand sides. The first-cell center should lie in the logarithmic layer, normally \(30\lesssim y^+\lesssim200\); the implementation does not make a low-Reynolds-number \(k\)-\(\varepsilon\) model out of a fine near-wall mesh.
+
+A configurable `maximum_eddy_viscosity_ratio = 1000` is available as a numerical realizability safeguard against singular startup values. It is not a model constant. Cap usage is reported by the validation driver and should be negligible in a converged, physically meaningful solution.
+
+### Menter SST-2003 \(k\)-\(\omega\)
+
+The SST implementation uses the 2003 strain-invariant form, \(F_1/F_2\) blending, cross-diffusion, limited production in both equations, and
+
+$$
+\mu_t=\frac{\rho a_1k}{\max(a_1\omega,SF_2)},\qquad a_1=0.31.
+$$
+
+Constants are \(\beta^*=0.09\), \(\gamma_1=5/9\), \(\gamma_2=0.44\), \(\sigma_{k1}=0.85\), \(\sigma_{k2}=1.0\), \(\sigma_{\omega1}=0.5\), \(\sigma_{\omega2}=0.856\), \(\beta_1=0.075\), and \(\beta_2=0.0828\). Wall distance is the exact minimum point-to-segment distance to a no-slip wall. At the wall, \(k=0\) and
+
+$$
+\omega_w=\frac{6\nu}{\beta_1y_P^2}.
+$$
+
+SST is integrated to the wall and should use a wall-resolved mesh, normally \(y^+\approx1\) or smaller. The standard \(k\)-\(\varepsilon\) wall function is not used for SST.
+
+### Turbulence boundary and initial settings
+
+Select the model and initialize positive fields, for example:
+
+```ini
+turbulence_model = k_epsilon       # laminar, k_epsilon, or sst_k_omega
+initial_velocity = 1 0
+initial_k = 1.5e-4
+initial_epsilon = 1.125           # use initial_omega for SST
+turbulence_relaxation = 0.3
+turbulence_convection_blending = 0.0
+turbulence_tolerance = 2.0e-6
+maximum_eddy_viscosity_ratio = 1000
+```
+
+Every patch of a turbulent case needs `k` and the appropriate scale entry in addition to `velocity` and `pressure`:
+
+```ini
+[boundary.inlet]
+velocity = fixedValue 1 0
+pressure = zeroGradient
+k = fixedValue 1.5e-4
+epsilon = fixedValue 1.125
+
+[boundary.outlet]
+velocity = zeroGradient
+pressure = fixedValue 0
+k = zeroGradient
+epsilon = zeroGradient
+
+[boundary.walls]
+velocity = noSlip
+pressure = zeroGradient
+k = zeroGradient                 # SST: fixedValue 0
+epsilon = wallFunction           # SST: omega = wallFunction
+```
+
+For an inlet with turbulence intensity \(I\) and eddy-viscosity ratio \(r=\mu_t/\mu\),
+
+$$
+k=\frac32(IU)^2,\qquad
+\varepsilon=\frac{C_\mu\rho k^2}{r\mu},\qquad
+\omega=\frac{\rho k}{r\mu}.
+$$
+
+Alternatively, \(\varepsilon=C_\mu^{3/4}k^{3/2}/\ell\) and \(\omega=\varepsilon/(\beta^*k)\) can be used with a chosen turbulence length scale \(\ell\). The supplied plate cases use \(I=1\%\) and \(r=0.009\) for \(k\)-\(\varepsilon\), and \(I=0.039\%\) and \(r=0.009\) for SST; the elbow cases use \(I=5\%\) and \(\ell=0.07D\).
+
+Turbulence lower bounds default to `minimum_k = 1e-12`, `minimum_epsilon = 1e-12`, and `minimum_omega = 1e-8`. `turbulence_ksp` and `turbulence_pc` select the scalar linear solver and preconditioner. The summary's `turbulence_change` is the larger infinity-norm update of \(k\) and its scale, normalized by the corresponding current field maximum.
 
 ## Project layout
 
@@ -169,6 +275,7 @@ They can be changed in `case.in`. Standard PETSc command-line options are also p
 │   │   ├── Field.hpp           Scalar/vector fields and boundary values
 │   │   ├── Gradient.hpp/.cpp   Gauss and least-squares reconstruction
 │   │   ├── Operators.hpp/.cpp  Interpolation, convection, and diffusion data
+│   │   ├── ScalarTransport.*   Conservative variable-diffusivity scalar equations
 │   │   ├── TimeDerivative.*    Steady, Euler, and BDF2 coefficients
 │   │   ├── PetscLinearSystem.* Sparse matrices and PETSc KSP wrapper
 │   │   ├── TecplotWriter.*     Unstructured Tecplot ASCII output
@@ -176,13 +283,19 @@ They can be changed in `case.in`. Standard PETSc command-line options are also p
 │   │   └── PhysicsSolver.hpp   Common interface for physics modules
 │   └── flow/
 │       ├── BoundaryConditions.* Flow boundary-condition handling
-│       └── SimpleSolver.*       SIMPLE, Rhie–Chow, and Navier–Stokes assembly
-└── cases/
-    ├── generate_meshes.py      Reproducible supplied Gmsh meshes
-    ├── validate.py             Conservation and benchmark checks
-    ├── cavity/                 Lid-driven cavity configuration and mesh
-    ├── backstep/               Backward-facing step configuration and mesh
-    └── cylinder/               Flow-around-cylinder configuration and mesh
+│       ├── TurbulenceModel.*   Standard k-epsilon and SST-2003 implementations
+│       └── SimpleSolver.*      SIMPLE, Rhie–Chow, and RANS assembly
+├── cases/
+│   ├── generate_meshes.py      Reproducible supplied Gmsh meshes
+│   ├── validate.py             Laminar conservation and benchmark checks
+│   ├── validate_turbulence.py  Turbulence runs, reference errors, and plots
+│   ├── cavity/                 Lid-driven cavity configuration and mesh
+│   ├── backstep/               Backward-facing step configuration and mesh
+│   ├── cylinder/               Flow-around-cylinder configuration and mesh
+│   ├── plate_*/                Flat-plate cases for both turbulence models
+│   └── elbow_*/                90-degree elbow cases for both models
+├── reference/                 NASA and Enayet/Ansys comparison data
+└── validation/               Turbulence report, metrics, data, and figures
 ```
 
 Additional teaching material is under `textbook/` and `texbook-ppt/`. The empty physics directories are reserved for future development.
@@ -194,14 +307,14 @@ The supported build environment is WSL Ubuntu with:
 - A C++17 compiler.
 - GNU Make.
 - MPICH providing `mpic++`.
-- PETSc 3.26.0, including its KSP library and external-link configuration.
+- PETSc 3.21.0, including its KSP library and external-link configuration.
 - Python 3 for mesh generation and validation.
 
 The configured installation paths are:
 
 ```text
-PETSc: /home/lwa/program/petsc-3.26.0
-MPICH: /home/lwa/program/mpich-5.0.2
+PETSc: /home/lwa/program/petsc-3.21.0
+MPICH: /home/lwa/program/mpich-4.2.0
 ```
 
 Python uses only the standard library. Gmsh is **not required** to run the supplied cases because their `.msh` files are already included. Gmsh is only needed if you want to generate independent meshes from your own geometry.
@@ -213,9 +326,9 @@ Python uses only the standard library. Gmsh is **not required** to run the suppl
 From Git Bash, WSL commands may need `MSYS_NO_PATHCONV=1` so that Linux paths are not rewritten. Inside WSL, set:
 
 ```bash
-export PETSC_DIR=/home/lwa/program/petsc-3.26.0
-export PATH=/home/lwa/program/mpich-5.0.2/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin
-export LD_LIBRARY_PATH=/home/lwa/program/petsc-3.26.0/lib:/home/lwa/program/lapack-3.12.1/lib:/home/lwa/program/mpich-5.0.2/lib:${LD_LIBRARY_PATH:-}
+export PETSC_DIR=/home/lwa/program/petsc-3.21.0
+export PATH=/home/lwa/program/mpich-4.2.0/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin
+export LD_LIBRARY_PATH=/home/lwa/program/petsc-3.21.0/lib:/home/lwa/program/lapack-3.12.1/lib:/home/lwa/program/mpich-4.2.0/lib:${LD_LIBRARY_PATH:-}
 ```
 
 Then enter the project directory. On the current machine it is:
@@ -259,6 +372,10 @@ Pass either a case directory or the full path to a `case.in` file:
 ./multiphysics cases/cavity
 ./multiphysics cases/backstep/case.in
 ./multiphysics cases/cylinder
+./multiphysics cases/plate_k_epsilon
+./multiphysics cases/plate_sst_k_omega
+./multiphysics cases/elbow_k_epsilon
+./multiphysics cases/elbow_sst_k_omega
 ```
 
 Mesh and output paths in `case.in` are resolved relative to that case directory, not relative to the shell's working directory.
@@ -271,8 +388,9 @@ Run the solver directly, without `mpirun`; the current implementation intentiona
 |---|---|
 | `make` or `make -j` | Build `multiphysics`. |
 | `make meshes` | Regenerate all supplied Gmsh meshes. This overwrites the generated `.msh` files. |
-| `make validate` | Run cavity, backstep, and cylinder, then execute all validation checks. |
-| `make clean` | Remove the executable and `build/`. It does not remove case results. |
+| `make validate` | Run all laminar regressions and the complete plate/elbow turbulence matrix. |
+| `make validate-turbulence` | Run both models at all plate/elbow resolutions, check conservation and accuracy, and generate comparison data and SVG plots. |
+| `make clean` | Remove the executable and `build/`. It does not remove case results or `validation/`. |
 
 ## Case configuration
 
@@ -295,6 +413,16 @@ pressure = zeroGradient
 | `viscosity` | `0.01` | Constant dynamic viscosity \(\mu\). |
 | `initial_velocity` | `0 0` | Initial cell velocity, two components. |
 | `initial_pressure` | `0.0` | Initial cell pressure. |
+| `turbulence_model` | `laminar` | `laminar`, `k_epsilon`, or `sst_k_omega`. |
+| `initial_k` | `1e-6` | Initial turbulent kinetic energy; must exceed its floor. |
+| `initial_epsilon` | `1e-6` | Initial dissipation for `k_epsilon`. |
+| `initial_omega` | `1.0` | Initial specific dissipation for SST. |
+| `turbulence_relaxation` | `0.5` | Under-relaxation for turbulence equations in `(0,1]`. |
+| `turbulence_convection_blending` | `0.0` | Zero for upwind, one for deferred central correction. |
+| `turbulence_tolerance` | value of `tolerance` | Maximum normalized turbulence update. |
+| `turbulence_ksp` | `bcgs` | PETSc KSP type for turbulence transport. |
+| `turbulence_pc` | `ilu` | PETSc preconditioner for turbulence transport. |
+| `maximum_eddy_viscosity_ratio` | `1000` | Numerical \(\mu_t/\mu\) safeguard for standard \(k\)-\(\varepsilon\). |
 | `body_force` | `0 0` | Body force per unit mass, two components. |
 | `gradient` | `least_squares` | `least_squares`/`lsq` or `gauss`/`green_gauss`. |
 | `convection_blending` | `1.0` | Zero for upwind, one for central, or an intermediate blend. |
@@ -426,8 +554,10 @@ The generator uses only Python's standard library and writes ASCII Gmsh 2.2 file
 | Cavity | Unit square, 3,200 triangles. |
 | Backstep | Inlet region `[-1,0] × [0.5,1]` and expanded region `[0,8] × [0,1]`, 4,896 triangles. |
 | Cylinder | Diameter-one cylinder at the origin, outer domain `[-4,16] × [-4,4]`, 2,304 body-fitted quadrilaterals. |
+| Flat plate | Symmetry run-up and plate `0 ≤ x ≤ 2`; 4,500 / 9,380 / 20,000 quadrilaterals by level. |
+| Elbow | Planar 90° annulus with `Rc/D = 2.8`, 5D upstream and 10D downstream; 3,960 / 8,500 / 16,800 quadrilaterals. |
 
-The cylinder generator classifies inner-wall edges using both endpoint radii. This avoids mistakenly assigning a chord's midpoint to a far-field patch.
+The cylinder generator classifies inner-wall edges using both endpoint radii. This avoids mistakenly assigning a chord's midpoint to a far-field patch. Plate and elbow meshes use different first-cell heights for wall-function and wall-resolved models.
 
 ## Output files
 
@@ -439,10 +569,17 @@ The default output is ASCII Tecplot. Nodal coordinates and cell-centered fields 
 |---|---|---|
 | `X`, `Y` | Nodes | Mesh coordinates. |
 | `U_x`, `U_y` | Cell centres | Velocity components. |
-| `p` | Cell centres | Pressure. |
+| `p` | Cell centres | Static pressure. |
 | `mass_imbalance` | Cell centres | Signed integrated cell mass imbalance in the current mass-flux units. |
+| `k` | Cell centres | Turbulent kinetic energy, for turbulent cases. |
+| `epsilon` | Cell centres | Dissipation, for `k_epsilon`. |
+| `omega` | Cell centres | Specific dissipation, for SST. |
+| `mu_t` | Cell centres | Turbulent dynamic eddy viscosity. |
+| `F1`, `F2` | Cell centres | SST blending functions. |
 
 Mixed meshes are written as separate triangle and quadrilateral zones. A steady case writes the configured file directly. A transient case appends the time-step number to the stem, for example `flow_100.plt`.
+
+Turbulent cases also write `<output-stem>_wall.csv` with patch name, face-center coordinates, wall distance, shear-stress vector, friction velocity, and \(y^+\) for every no-slip face.
 
 ### Convergence summary
 
@@ -454,9 +591,11 @@ Each run also writes `<output-stem>_summary.csv` with:
 - `pressure_change`
 - `max_cell_imbalance`
 - `net_boundary_flux`
+- `turbulence_change`
+- `turbulence_linear_iterations`
 - `converged`
 
-The console log uses `dU` for the maximum cell-velocity update, `dp` for the maximum relaxed pressure update, `continuity` for the maximum absolute cell mass imbalance, and `linear` for the total PETSc iterations used by that outer iteration's momentum and pressure solves.
+The console log uses `dU` for the maximum cell-velocity update, `dp` for the maximum relaxed pressure update, `dT` for the normalized turbulence update, `continuity` for the maximum absolute cell mass imbalance, and `linear` for the total PETSc iterations used by that outer iteration's momentum, pressure, and turbulence solves. Laminar output retains zero turbulence diagnostics.
 
 ## Validation cases
 
@@ -466,7 +605,7 @@ Run the complete workflow:
 make validate
 ```
 
-This runs the actual solver for all three supplied cases and then checks the resulting Tecplot and CSV files with `cases/validate.py`.
+This runs the three laminar regressions and all twelve plate/elbow turbulence cases. `cases/validate.py` checks the laminar cases; `cases/validate_turbulence.py --run` executes the turbulence matrix, checks conservation and accuracy, and writes `validation/metrics.csv`, comparison CSVs, and SVG plots. The detailed model-validation report is [`validation/turbulence_validation.md`](validation/turbulence_validation.md).
 
 ### Current results
 
@@ -502,6 +641,12 @@ The supplied physical parameters are:
 | Cavity | Lid speed `1`, `rho = 1`, `mu = 0.01`, giving Re = 100 for unit length. |
 | Backstep | Mean inlet speed `1`, inlet height `0.5`, `rho = 1`, `mu = 0.005`, giving Re = 100 based on inlet height. |
 | Cylinder | Freestream speed `1`, diameter `1`, `rho = 1`, `mu = 0.025`, giving Re = 40. |
+
+### Turbulence validation
+
+The flat-plate study compares both models with NASA's Kármán–Schoenherr \(C_f(Re_\theta)\) relation and Coles \(u^+(y^+)\) profile at \(Re_\theta=10{,}000\), using three grid/near-wall-spacing levels. The elbow study compares the 75° streamwise section with Enayet's experimental points, also at three levels. All turbulence cases require coupled convergence, finite positive turbulence fields, local/global mass conservation, and appropriate near-wall spacing. Flat-plate normalized RMSE above 10% is a validation failure; elbow errors are reported without a hard accuracy gate because the solver is planar while the experiment is three-dimensional.
+
+The reference files, digitization uncertainty, and source URLs are under `reference/`. See `validation/turbulence_validation.md` for final values, grid sensitivity, cap usage, and the limitations of comparing a 2D elbow with a 3D pipe experiment.
 
 ## Adding a new case
 
@@ -551,7 +696,8 @@ At present, `src/main.cpp` directly constructs `SimpleSolver`. A general physics
 - Serial execution only; there is no domain decomposition or distributed PETSc matrix assembly.
 - Two-dimensional linear triangles and quadrilaterals only.
 - Constant density and dynamic viscosity.
-- No turbulence model.
+- Two-dimensional RANS only: three-dimensional secondary flow, swirl, and cross-sectional Dean vortices cannot be represented.
+- Only standard \(k\)-\(\varepsilon\) and SST-2003; no transition, compressibility, buoyancy, curvature/rotation correction, DES, or Reynolds-stress model.
 - No elastic or acoustic field solver yet.
 - No fluid–structure or fluid–acoustic coupling yet.
 - No convection limiter, so central reconstruction can produce oscillations in strongly convection-dominated or poor-quality-mesh cases.
@@ -632,7 +778,7 @@ At present, `src/main.cpp` directly constructs `SimpleSolver`. A general physics
 Set the MPICH binary directory explicitly before running Make:
 
 ```bash
-export PATH=/home/lwa/program/mpich-5.0.2/bin:$PATH
+export PATH=/home/lwa/program/mpich-4.2.0/bin:$PATH
 ```
 
 ### PETSc configuration or libraries cannot be found
@@ -640,7 +786,7 @@ export PATH=/home/lwa/program/mpich-5.0.2/bin:$PATH
 Confirm that this file exists:
 
 ```text
-/home/lwa/program/petsc-3.26.0/lib/petsc/conf/variables
+/home/lwa/program/petsc-3.21.0/lib/petsc/conf/variables
 ```
 
 If PETSc is installed elsewhere, set `PETSC_DIR` or pass it to Make:

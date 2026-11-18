@@ -45,6 +45,8 @@ SimpleSolver::SimpleSolver(const Mesh& mesh, const Config& config, std::filesyst
     if (convectionBlending_ < 0.0 || convectionBlending_ > 1.0) {
         throw std::runtime_error("convection_blending must be between zero (upwind) and one (central)");
     }
+    turbulence_ = makeTurbulenceModel(mesh_, config_, boundaryConditions_, density_, viscosity_);
+    if (turbulence_) std::cout << "Turbulence model: " << turbulence_->name() << '\n';
 }
 
 void SimpleSolver::initialize() {
@@ -66,6 +68,7 @@ void SimpleSolver::updateBoundaries() {
         pressure_.boundary(face) = boundaryConditions_.pressure(face, pressure_[owner]);
         pressure_.boundaryDirichlet(face) = boundaryConditions_.fixedPressure(face);
     }
+    if (turbulence_) turbulence_->updateBoundaries();
 }
 
 void SimpleSolver::computeMassFlux(bool rhieChow) {
@@ -96,11 +99,27 @@ void SimpleSolver::computeMassFlux(bool rhieChow) {
 LinearSolveInfo SimpleSolver::solveMomentum(double dt) {
     const auto velocityGradient = gradient_->vector(velocity_);
     const auto pressureGradient = gradient_->scalar(pressure_);
+    std::vector<ScalarGradient> kineticEnergyGradient;
+    if (turbulence_) kineticEnergyGradient = gradient_->scalar(turbulence_->k());
     const TimeCoefficients time = timeDerivative_.coefficients(dt, hasOldOldVelocity_);
     const int cellCount = static_cast<int>(mesh_.cells.size());
     SparseMatrix matrix(cellCount);
     std::vector<double> rhsX(cellCount, 0.0), rhsY(cellCount, 0.0);
     std::vector<Vector2> rhs(cellCount, bodyForce_ * density_);
+
+    auto turbulentStressFlux = [&](std::size_t faceIndex, const VectorGradient& faceGradient,
+                                   double eddyViscosity) {
+        Vector2 result;
+        if (eddyViscosity <= 0.0) return result;
+        const Vector2 area = faceVector(mesh_, faceIndex);
+        const double divergence = faceGradient[0].x + faceGradient[1].y;
+        for (int component = 0; component < 2; ++component) {
+            const Vector2 transposeRow{faceGradient[0][component], faceGradient[1][component]};
+            result[component] = eddyViscosity * (dot(transposeRow, area) -
+                (2.0 / 3.0) * divergence * area[component]);
+        }
+        return result;
+    };
 
     for (int cell = 0; cell < cellCount; ++cell) {
         const double volume = mesh_.cells[cell].volume;
@@ -108,26 +127,36 @@ LinearSolveInfo SimpleSolver::solveMomentum(double dt) {
         rhs[cell] += oldVelocity_[cell] * (density_ * volume * time.previous) +
                      oldOldVelocity_[cell] * (density_ * volume * time.previousPrevious) -
                      pressureGradient[cell] * volume;
+        if (turbulence_) {
+            rhs[cell] -= kineticEnergyGradient[cell] * ((2.0 / 3.0) * density_ * volume);
+        }
     }
 
     for (std::size_t faceIndex = 0; faceIndex < mesh_.internalFaceCount(); ++faceIndex) {
         const Face& face = mesh_.faces[faceIndex];
         const int owner = face.owner;
         const int neighbour = face.neighbour;
-        const double diffusion = diffusionConductance(mesh_, faceIndex, viscosity_);
+        const double eddyViscosity = turbulence_
+            ? interpolate(mesh_, turbulence_->turbulentViscosity(), faceIndex) : 0.0;
+        const double effectiveViscosity = viscosity_ + eddyViscosity;
+        const double diffusion = diffusionConductance(mesh_, faceIndex, effectiveViscosity);
         matrix.add(owner, owner, diffusion);
         matrix.add(owner, neighbour, -diffusion);
         matrix.add(neighbour, neighbour, diffusion);
         matrix.add(neighbour, owner, -diffusion);
 
         const Vector2 correctionVector = nonOrthogonalVector(mesh_, faceIndex);
+        VectorGradient faceGradient;
         for (int component = 0; component < 2; ++component) {
-            const Vector2 faceGradient = face.ownerWeight * velocityGradient[owner][component] +
+            faceGradient[component] = face.ownerWeight * velocityGradient[owner][component] +
                 (1.0 - face.ownerWeight) * velocityGradient[neighbour][component];
-            const double correction = viscosity_ * dot(correctionVector, faceGradient);
+            const double correction = effectiveViscosity * dot(correctionVector, faceGradient[component]);
             rhs[owner][component] += correction;
             rhs[neighbour][component] -= correction;
         }
+        const Vector2 turbulentFlux = turbulentStressFlux(faceIndex, faceGradient, eddyViscosity);
+        rhs[owner] += turbulentFlux;
+        rhs[neighbour] -= turbulentFlux;
 
         const double flux = massFlux_[faceIndex];
         const ConvectionCoefficients convection = upwindConvection(flux);
@@ -147,12 +176,19 @@ LinearSolveInfo SimpleSolver::solveMomentum(double dt) {
         const int owner = face.owner;
         const Vector2 boundaryVelocity = velocity_.boundary(faceIndex);
         if (boundaryConditions_.fixedVelocity(faceIndex)) {
-            const double diffusion = diffusionConductance(mesh_, faceIndex, viscosity_);
-            matrix.add(owner, owner, diffusion);
-            const Vector2 correctionVector = nonOrthogonalVector(mesh_, faceIndex);
-            for (int component = 0; component < 2; ++component) {
-                rhs[owner][component] += diffusion * boundaryVelocity[component] +
-                    viscosity_ * dot(correctionVector, velocityGradient[owner][component]);
+            if (turbulence_ && turbulence_->usesStandardWallFunction() && boundaryConditions_.noSlip(faceIndex)) {
+                rhs[owner] -= turbulence_->wallShearStress(faceIndex, velocity_[owner]) * face.area;
+            } else {
+                const double eddyViscosity = turbulence_ ? turbulence_->faceEddyViscosity(faceIndex) : 0.0;
+                const double effectiveViscosity = viscosity_ + eddyViscosity;
+                const double diffusion = diffusionConductance(mesh_, faceIndex, effectiveViscosity);
+                matrix.add(owner, owner, diffusion);
+                const Vector2 correctionVector = nonOrthogonalVector(mesh_, faceIndex);
+                for (int component = 0; component < 2; ++component) {
+                    rhs[owner][component] += diffusion * boundaryVelocity[component] +
+                        effectiveViscosity * dot(correctionVector, velocityGradient[owner][component]);
+                }
+                rhs[owner] += turbulentStressFlux(faceIndex, velocityGradient[owner], eddyViscosity);
             }
         }
 
@@ -270,14 +306,21 @@ double SimpleSolver::netBoundaryFlux() const {
 FlowDiagnostics SimpleSolver::solveStep(double dt, int maximumIterations) {
     FlowDiagnostics diagnostics;
     const int logInterval = config_.integer("log_interval", 10);
+    const double turbulenceTolerance = config_.number("turbulence_tolerance", outerTolerance_);
     for (int iteration = 1; iteration <= maximumIterations; ++iteration) {
         previousVelocity_.values() = velocity_.values();
+        if (turbulence_) turbulence_->beginIteration();
         const LinearSolveInfo momentum = solveMomentum(dt);
         const LinearSolveInfo pressure = correctPressure();
+        if (turbulence_) {
+            turbulence_->solve(dt, hasOldOldVelocity_, velocity_, massFlux_, *gradient_);
+        }
         const std::vector<double> imbalance = cellImbalance();
         diagnostics.iterations = iteration;
         diagnostics.momentumLinearIterations = momentum.iterations;
         diagnostics.pressureLinearIterations = pressure.iterations;
+        diagnostics.turbulenceChange = turbulence_ ? turbulence_->change() : 0.0;
+        diagnostics.turbulenceLinearIterations = turbulence_ ? turbulence_->linearIterations() : 0;
         diagnostics.velocityChange = 0.0;
         diagnostics.pressureChange = 0.0;
         diagnostics.maxCellImbalance = 0.0;
@@ -289,12 +332,15 @@ FlowDiagnostics SimpleSolver::solveStep(double dt, int maximumIterations) {
         }
         diagnostics.netBoundaryFlux = netBoundaryFlux();
         diagnostics.converged = diagnostics.velocityChange < outerTolerance_ &&
-            diagnostics.pressureChange < outerTolerance_ && diagnostics.maxCellImbalance < continuityTolerance_;
+            diagnostics.pressureChange < outerTolerance_ && diagnostics.maxCellImbalance < continuityTolerance_ &&
+            (!turbulence_ || diagnostics.turbulenceChange < turbulenceTolerance);
         if (iteration == 1 || iteration % logInterval == 0 || diagnostics.converged || iteration == maximumIterations) {
             std::cout << (timeDerivative_.isSteady() ? "SIMPLE " : "  outer ")
                       << std::setw(6) << iteration << "  dU=" << std::scientific << diagnostics.velocityChange
-                      << "  dp=" << diagnostics.pressureChange << "  continuity=" << diagnostics.maxCellImbalance
-                      << "  linear=" << diagnostics.momentumLinearIterations + diagnostics.pressureLinearIterations << '\n';
+                      << "  dp=" << diagnostics.pressureChange << "  dT=" << diagnostics.turbulenceChange
+                      << "  continuity=" << diagnostics.maxCellImbalance
+                      << "  linear=" << diagnostics.momentumLinearIterations + diagnostics.pressureLinearIterations +
+                         diagnostics.turbulenceLinearIterations << '\n';
         }
         if (diagnostics.converged) break;
     }
@@ -313,6 +359,7 @@ void SimpleSolver::advance(double dt) {
 void SimpleSolver::updateTimeHistory() {
     oldOldVelocity_.values() = oldVelocity_.values();
     oldVelocity_.values() = velocity_.values();
+    if (turbulence_) turbulence_->updateTimeHistory(hasOldOldVelocity_);
     hasOldOldVelocity_ = true;
 }
 
@@ -324,7 +371,20 @@ std::filesystem::path SimpleSolver::outputFile() const {
 void SimpleSolver::write(const std::filesystem::path& file) const {
     ScalarField imbalance("mass_imbalance", mesh_);
     imbalance.values() = cellImbalance();
-    writeTecplot(file, mesh_, {{"p", &pressure_}, {"mass_imbalance", &imbalance}}, {{"U", &velocity_}}, name(), currentTime_);
+    std::map<std::string, const ScalarField*> scalars{{"p", &pressure_}, {"mass_imbalance", &imbalance}};
+    if (turbulence_) {
+        scalars["k"] = &turbulence_->k();
+        scalars[turbulence_->scale().name()] = &turbulence_->scale();
+        scalars["mu_t"] = &turbulence_->turbulentViscosity();
+        if (turbulence_->kind() == TurbulenceModelKind::SSTMenter2003) {
+            scalars["F1"] = &turbulence_->blendingF1();
+            scalars["F2"] = &turbulence_->blendingF2();
+        }
+    }
+    writeTecplot(file, mesh_, scalars, {{"U", &velocity_}}, name(), currentTime_);
+    if (turbulence_) {
+        writeWallDiagnostics(file.parent_path() / (file.stem().string() + "_wall.csv"));
+    }
 }
 
 void SimpleSolver::writeSummary(const std::filesystem::path& file, double time,
@@ -333,10 +393,27 @@ void SimpleSolver::writeSummary(const std::filesystem::path& file, double time,
     std::ofstream output(file, append ? std::ios::app : std::ios::trunc);
     if (!output) throw std::runtime_error("Cannot write flow summary: " + file.string());
     output << std::setprecision(12) << std::scientific;
-    if (!append) output << "time,iterations,velocity_change,pressure_change,max_cell_imbalance,net_boundary_flux,converged\n";
+    if (!append) output << "time,iterations,velocity_change,pressure_change,max_cell_imbalance,net_boundary_flux,turbulence_change,turbulence_linear_iterations,converged\n";
     output << time << ',' << diagnostics.iterations << ',' << diagnostics.velocityChange << ','
            << diagnostics.pressureChange << ',' << diagnostics.maxCellImbalance << ','
-           << diagnostics.netBoundaryFlux << ',' << (diagnostics.converged ? 1 : 0) << '\n';
+           << diagnostics.netBoundaryFlux << ',' << diagnostics.turbulenceChange << ','
+           << diagnostics.turbulenceLinearIterations << ',' << (diagnostics.converged ? 1 : 0) << '\n';
+}
+
+void SimpleSolver::writeWallDiagnostics(const std::filesystem::path& file) const {
+    std::filesystem::create_directories(file.parent_path());
+    std::ofstream output(file);
+    if (!output) throw std::runtime_error("Cannot write wall diagnostics: " + file.string());
+    output << std::setprecision(12) << std::scientific;
+    output << "patch,x,y,distance,tau_x,tau_y,friction_velocity,y_plus\n";
+    for (std::size_t face = mesh_.internalFaceCount(); face < mesh_.faces.size(); ++face) {
+        if (!boundaryConditions_.noSlip(face)) continue;
+        const TurbulenceWallDiagnostics diagnostics = turbulence_->wallDiagnostics(face, velocity_[mesh_.faces[face].owner]);
+        const Face& wall = mesh_.faces[face];
+        output << mesh_.patches[wall.patch].name << ',' << wall.centre.x << ',' << wall.centre.y << ','
+               << diagnostics.distance << ',' << diagnostics.shear.x << ',' << diagnostics.shear.y << ','
+               << diagnostics.frictionVelocity << ',' << diagnostics.yPlus << '\n';
+    }
 }
 
 void SimpleSolver::run() {

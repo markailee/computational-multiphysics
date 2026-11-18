@@ -103,6 +103,10 @@ bool FlowBoundaryConditions::fixedPressure(std::size_t faceIndex) const {
     return conditions_[mesh_->faces[faceIndex].patch].pressureType == PressureBoundaryType::FixedValue;
 }
 
+bool FlowBoundaryConditions::noSlip(std::size_t faceIndex) const {
+    return conditions_[mesh_->faces[faceIndex].patch].velocityType == VelocityBoundaryType::NoSlip;
+}
+
 bool FlowBoundaryConditions::slip(std::size_t faceIndex) const {
     return conditions_[mesh_->faces[faceIndex].patch].velocityType == VelocityBoundaryType::Slip;
 }

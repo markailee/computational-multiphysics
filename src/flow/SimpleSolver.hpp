@@ -1,6 +1,7 @@
 #pragma once
 
 #include "flow/BoundaryConditions.hpp"
+#include "flow/TurbulenceModel.hpp"
 #include "fvm/PetscLinearSystem.hpp"
 #include "fvm/Config.hpp"
 #include "fvm/Gradient.hpp"
@@ -21,6 +22,8 @@ struct FlowDiagnostics {
     double netBoundaryFlux = 0.0;
     int momentumLinearIterations = 0;
     int pressureLinearIterations = 0;
+    double turbulenceChange = 0.0;
+    int turbulenceLinearIterations = 0;
     bool converged = false;
 };
 
@@ -49,6 +52,7 @@ private:
     std::filesystem::path outputFile() const;
     void writeSummary(const std::filesystem::path& file, double time,
                       const FlowDiagnostics& diagnostics, bool append) const;
+    void writeWallDiagnostics(const std::filesystem::path& file) const;
 
     const Mesh& mesh_;
     const Config& config_;
@@ -77,6 +81,7 @@ private:
     std::vector<double> momentumDiagonal_;
     PetscLinearSystem momentumSystem_;
     PetscLinearSystem pressureSystem_;
+    std::unique_ptr<TurbulenceModel> turbulence_;
     FlowDiagnostics diagnostics_;
     double currentTime_ = 0.0;
     bool initialized_ = false;

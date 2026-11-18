@@ -26,6 +26,7 @@ public:
     double pressure(std::size_t faceIndex, double cellPressure) const;
     bool fixedVelocity(std::size_t faceIndex) const;
     bool fixedPressure(std::size_t faceIndex) const;
+    bool noSlip(std::size_t faceIndex) const;
     bool slip(std::size_t faceIndex) const;
     bool hasFixedPressure() const;
 
