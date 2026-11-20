@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="500" viewBox="0 0 900 500">
+<rect width="100%" height="100%" fill="white"/>
+<text x="450.0" y="28" text-anchor="middle" font-family="sans-serif" font-size="19">cavity medium centreline</text>
+<line x1="80.00" y1="55" x2="80.00" y2="435" stroke="#e5e5e5"/>
+<line x1="80" y1="435.00" x2="870" y2="435.00" stroke="#e5e5e5"/>
+<text x="80.00" y="455" text-anchor="middle" font-family="sans-serif" font-size="11">0</text>
+<text x="72" y="439.00" text-anchor="end" font-family="sans-serif" font-size="11">-0.000227</text>
+<line x1="238.00" y1="55" x2="238.00" y2="435" stroke="#e5e5e5"/>
+<line x1="80" y1="359.00" x2="870" y2="359.00" stroke="#e5e5e5"/>
+<text x="238.00" y="455" text-anchor="middle" font-family="sans-serif" font-size="11">0.4</text>
+<text x="72" y="363.00" text-anchor="end" font-family="sans-serif" font-size="11">-9.81e-05</text>
+<line x1="396.00" y1="55" x2="396.00" y2="435" stroke="#e5e5e5"/>
+<line x1="80" y1="283.00" x2="870" y2="283.00" stroke="#e5e5e5"/>
+<text x="396.00" y="455" text-anchor="middle" font-family="sans-serif" font-size="11">0.8</text>
+<text x="72" y="287.00" text-anchor="end" font-family="sans-serif" font-size="11">3.07e-05</text>
+<line x1="554.00" y1="55" x2="554.00" y2="435" stroke="#e5e5e5"/>
+<line x1="80" y1="207.00" x2="870" y2="207.00" stroke="#e5e5e5"/>
+<text x="554.00" y="455" text-anchor="middle" font-family="sans-serif" font-size="11">1.2</text>
+<text x="72" y="211.00" text-anchor="end" font-family="sans-serif" font-size="11">0.000159</text>
+<line x1="712.00" y1="55" x2="712.00" y2="435" stroke="#e5e5e5"/>
+<line x1="80" y1="131.00" x2="870" y2="131.00" stroke="#e5e5e5"/>
+<text x="712.00" y="455" text-anchor="middle" font-family="sans-serif" font-size="11">1.6</text>
+<text x="72" y="135.00" text-anchor="end" font-family="sans-serif" font-size="11">0.000288</text>
+<line x1="870.00" y1="55" x2="870.00" y2="435" stroke="#e5e5e5"/>
+<line x1="80" y1="55.00" x2="870" y2="55.00" stroke="#e5e5e5"/>
+<text x="870.00" y="455" text-anchor="middle" font-family="sans-serif" font-size="11">2</text>
+<text x="72" y="59.00" text-anchor="end" font-family="sans-serif" font-size="11">0.000417</text>
+<rect x="80" y="55" width="790" height="380" fill="none" stroke="#333"/>
+<polyline points="80.00,351.26 99.75,346.64 119.50,342.61 139.25,346.64 159.00,346.52 178.75,339.33 198.50,337.81 218.25,335.51 238.00,326.18 257.75,324.30 277.50,321.86 297.25,314.92 317.00,319.29 336.75,318.07 356.50,313.09 376.25,319.63 396.00,321.03 415.75,321.01 435.50,318.64 455.25,327.36 475.00,321.28 494.75,388.30 514.50,287.02 534.25,362.09 554.00,366.54 573.75,81.21 593.50,385.26 613.25,213.97 633.00,333.55 652.75,279.31 672.50,358.05 692.25,200.15 712.00,397.08 731.75,151.97 751.50,408.79 771.25,152.14 791.00,402.03 810.75,172.68 830.50,383.82 850.25,177.85 870.00,379.51" fill="none" stroke="#2166ac" stroke-width="1.8"/>
+<polyline points="80.00,301.11 99.75,301.11 119.50,301.11 139.25,301.11 159.00,301.11 178.75,301.11 198.50,301.11 218.25,301.11 238.00,301.11 257.75,301.11 277.50,301.11 297.25,301.11 317.00,301.11 336.75,301.11 356.50,301.11 376.25,301.11 396.00,301.11 415.75,301.11 435.50,301.11 455.25,301.11 475.00,301.11 494.75,301.11 514.50,301.11 534.25,301.11 554.00,301.11 573.75,301.11 593.50,301.11 613.25,301.11 633.00,301.11 652.75,301.11 672.50,301.11 692.25,301.11 712.00,301.11 731.75,301.11 751.50,301.11 771.25,301.11 791.00,301.11 810.75,301.11 830.50,301.11 850.25,301.11 870.00,301.11" fill="none" stroke="#b2182b" stroke-width="1.8" stroke-dasharray="6 3"/>
+<text x="450.0" y="485" text-anchor="middle" font-family="sans-serif" font-size="14">x</text>
+<text x="18" y="250.0" text-anchor="middle" transform="rotate(-90 18 250.0)" font-family="sans-serif" font-size="14">pressure</text>
+<line x1="690" y1="75" x2="718" y2="75" stroke="#2166ac" stroke-width="2"/>
+<text x="725" y="79" font-family="sans-serif" font-size="12">Numerical</text>
+<line x1="690" y1="97" x2="718" y2="97" stroke="#b2182b" stroke-width="2"/>
+<text x="725" y="101" font-family="sans-serif" font-size="12">Analytical</text>
+</svg>

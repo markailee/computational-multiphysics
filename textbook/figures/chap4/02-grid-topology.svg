@@ -1,0 +1,48 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="550" viewBox="0 0 1200 550" role="img" aria-labelledby="title desc">
+  <title id="title">结构化网格与非结构化网格</title>
+  <desc id="desc">展示规则四边形网格、不规则多边形网格以及单元中心未知量和界面法向</desc>
+  <defs>
+    <style>
+      text{font-family:"Microsoft YaHei","Noto Sans CJK SC",sans-serif;fill:#203040}
+      .mesh{stroke:#7591a7;stroke-width:2;fill:#f3f8fc}
+      .mesh2{stroke:#799989;stroke-width:2;fill:#f1f8f4}
+      .center{fill:#c34f52;stroke:white;stroke-width:2}
+      .label{font-size:20px;text-anchor:middle}
+    </style>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M0 0L10 5L0 10Z" fill="#326d98"/></marker>
+  </defs>
+  <rect width="1200" height="550" fill="#fbfcfe"/>
+  <text x="300" y="47" text-anchor="middle" font-size="26" font-weight="700">结构化网格</text>
+  <text x="890" y="47" text-anchor="middle" font-size="26" font-weight="700">非结构化网格</text>
+  <g class="mesh">
+    <rect x="90" y="90" width="105" height="85"/><rect x="195" y="90" width="105" height="85"/><rect x="300" y="90" width="105" height="85"/><rect x="405" y="90" width="105" height="85"/>
+    <rect x="90" y="175" width="105" height="85"/><rect x="195" y="175" width="105" height="85" fill="#e3eff8"/><rect x="300" y="175" width="105" height="85" fill="#e3eff8"/><rect x="405" y="175" width="105" height="85"/>
+    <rect x="90" y="260" width="105" height="85"/><rect x="195" y="260" width="105" height="85"/><rect x="300" y="260" width="105" height="85"/><rect x="405" y="260" width="105" height="85"/>
+  </g>
+  <g class="center"><circle cx="142" cy="132" r="6"/><circle cx="247" cy="132" r="6"/><circle cx="352" cy="132" r="6"/><circle cx="457" cy="132" r="6"/><circle cx="142" cy="217" r="6"/><circle cx="247" cy="217" r="7"/><circle cx="352" cy="217" r="7"/><circle cx="457" cy="217" r="6"/><circle cx="142" cy="302" r="6"/><circle cx="247" cy="302" r="6"/><circle cx="352" cy="302" r="6"/><circle cx="457" cy="302" r="6"/></g>
+  <text class="label" x="247" y="208">P(i,j)</text><text class="label" x="352" y="208">N(i+1,j)</text>
+  <line x1="300" y1="188" x2="300" y2="244" stroke="#326d98" stroke-width="4"/>
+  <text x="312" y="183" font-size="18" fill="#326d98">界面 f</text>
+  <text x="300" y="394" text-anchor="middle" font-size="19" fill="#536b7e">邻接关系由 (i,j) 索引隐式确定</text>
+  <text x="300" y="426" text-anchor="middle" font-size="19" fill="#536b7e">模板规则，便于线迭代与带状存储</text>
+  <g class="mesh2">
+    <polygon points="650,105 785,85 805,190 685,210"/>
+    <polygon points="785,85 930,110 900,210 805,190" fill="#e3f0e7"/>
+    <polygon points="930,110 1080,85 1060,215 900,210"/>
+    <polygon points="685,210 805,190 820,320 660,340" fill="#e3f0e7"/>
+    <polygon points="805,190 900,210 945,325 820,320"/>
+    <polygon points="900,210 1060,215 1050,345 945,325"/>
+    <polygon points="660,340 820,320 805,420 690,430"/>
+    <polygon points="820,320 945,325 960,425 805,420"/>
+    <polygon points="945,325 1050,345 1070,425 960,425"/>
+  </g>
+  <g class="center"><circle cx="735" cy="145" r="6"/><circle cx="850" cy="151" r="7"/><circle cx="990" cy="150" r="6"/><circle cx="742" cy="270" r="7"/><circle cx="870" cy="260" r="6"/><circle cx="990" cy="270" r="6"/><circle cx="745" cy="375" r="6"/><circle cx="880" cy="375" r="6"/><circle cx="1000" cy="375" r="6"/></g>
+  <text class="label" x="850" y="143">N</text><text class="label" x="742" y="261">P</text>
+  <line x1="805" y1="190" x2="685" y2="210" stroke="#326d98" stroke-width="4"/>
+  <line x1="742" y1="270" x2="850" y2="151" stroke="#c34f52" stroke-width="2.5" stroke-dasharray="7 5"/>
+  <line x1="747" y1="205" x2="780" y2="170" stroke="#326d98" stroke-width="3" marker-end="url(#arrow)"/>
+  <text x="786" y="168" font-size="19" fill="#326d98">n<tspan baseline-shift="sub" font-size="13">f</tspan></text>
+  <text x="890" y="470" text-anchor="middle" font-size="19" fill="#536b7e">每个界面显式保存 owner、neighbour 和面积矢量</text>
+  <text x="890" y="502" text-anchor="middle" font-size="19" fill="#536b7e">几何适应性强，但非正交性与偏斜度需要处理</text>
+  <line x1="590" y1="80" x2="590" y2="485" stroke="#d6dfe6" stroke-width="2"/>
+</svg>

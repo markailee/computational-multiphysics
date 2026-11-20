@@ -1,3 +1,4 @@
+#include "acoustic/AcousticSolver.hpp"
 #include "flow/SimpleSolver.hpp"
 #include "mesh/GmshReader.hpp"
 
@@ -26,8 +27,16 @@ int main(int argc, char** argv) {
         std::filesystem::path meshFile = config.require("mesh");
         if (meshFile.is_relative()) meshFile = caseDirectory / meshFile;
         mp::Mesh mesh = mp::readGmsh(meshFile);
-        mp::SimpleSolver solver(mesh, config, caseDirectory);
-        solver.run();
+        const std::string physics = mp::lowercase(config.get("physics", "flow"));
+        if (physics == "acoustic") {
+            mp::AcousticSolver solver(mesh, config, caseDirectory);
+            solver.run();
+        } else if (physics == "flow" || physics == "incompressible") {
+            mp::SimpleSolver solver(mesh, config, caseDirectory);
+            solver.run();
+        } else {
+            throw std::runtime_error("Unknown physics module: " + physics);
+        }
     } catch (const std::exception& error) {
         std::cerr << "Error: " << error.what() << '\n';
         result = 1;

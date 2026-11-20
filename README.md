@@ -1,10 +1,10 @@
 # 2D Multiphysics Finite-Volume Solver
 
-A C++17, cell-centered finite-volume project for two-dimensional multiphysics calculations on unstructured meshes. The current executable implements an **incompressible Navier–Stokes solver** using the SIMPLE pressure–velocity coupling algorithm. The mesh, field, discretization, linear-algebra, and output components are reusable foundations for the planned elastic and acoustic solvers.
+A C++17 finite-volume project for two-dimensional multiphysics calculations on unstructured meshes. The executable implements an **incompressible Navier–Stokes solver** using cell-centered SIMPLE pressure–velocity coupling and a **linear acoustic solver** using the node-centered dual-control-volume formulation of `textbook/Chap5-4-acoustic.md`. The mesh, discretization, linear-algebra, and output components are shared foundations for further physics modules.
 
 The project is intended for both numerical-method development and teaching. It emphasizes conservative face fluxes, explicit mesh connectivity, readable operator implementations, and reproducible benchmark cases.
 
-> **Current scope:** the working physics solver is serial, two-dimensional, constant-property, incompressible flow. Elasticity, acoustics, fluid–structure interaction, and MPI-distributed calculations are planned work; they are not yet implemented as coupled solvers.
+> **Current scope:** serial two-dimensional incompressible flow and linear acoustics are implemented as separate physics modules, with one-way Curle-type flow-to-acoustic source coupling for the cylinder aeolian-tone case. Flow uses cell-centered fields; acoustics uses nodal fields on median-dual control areas. Elasticity, two-way fluid–structure/acoustic coupling, non-uniform acoustic media, and MPI-distributed calculations remain future work.
 
 ## Contents
 
@@ -15,6 +15,7 @@ The project is intended for both numerical-method development and teaching. It e
 - [Build and run in WSL](#build-and-run-in-wsl)
 - [Case configuration](#case-configuration)
 - [Boundary conditions](#boundary-conditions)
+- [Acoustic configuration](#acoustic-configuration)
 - [Gmsh meshes](#gmsh-meshes)
 - [Output files](#output-files)
 - [Validation cases](#validation-cases)
@@ -68,6 +69,20 @@ The code under `src/flow/` implements:
 - Menter SST-2003 \(k\)-\(\omega\) turbulence with strain-based eddy-viscosity limiting and low-\(y^+\) wall integration.
 - Conservative transport of turbulence variables with bounded implicit upwind convection and optional deferred correction.
 - Turbulence fields, wall shear, friction velocity, and \(y^+\) diagnostics in Tecplot and CSV output.
+
+### Linear acoustic solver
+
+The code under `src/acoustic/` implements the formulation of `textbook/Chap5-4-acoustic.md`:
+
+- Nodal acoustic pressure on conforming mixed linear-triangle/quadrilateral meshes.
+- Median-dual control areas and diagonal lumped acoustic mass.
+- Full `(I - M ⊗ M)` fluxes and the centered mixed time-space term for a uniform subsonic mean flow.
+- Rigid, first-order absorbing, fixed-pressure, and analytical-plane-wave boundary conditions.
+- Zero, rigid-cavity-mode, plane-wave, and directed Gaussian-pulse initial conditions.
+- Optional spatially normalized harmonic Gaussian source.
+- Newmark and centered three-level time integration with consistent initial acceleration.
+- PETSc solves for non-diagonal systems and direct nodal updates for diagonal centered-difference systems.
+- Nodal Tecplot pressure/output rates, per-step summaries, probe histories, and geometry checks.
 
 ## Numerical formulation
 
@@ -281,14 +296,23 @@ Turbulence lower bounds default to `minimum_k = 1e-12`, `minimum_epsilon = 1e-12
 │   │   ├── TecplotWriter.*     Unstructured Tecplot ASCII output
 │   │   ├── Config.hpp/.cpp     Case-file parser
 │   │   └── PhysicsSolver.hpp   Common interface for physics modules
-│   └── flow/
-│       ├── BoundaryConditions.* Flow boundary-condition handling
-│       ├── TurbulenceModel.*   Standard k-epsilon and SST-2003 implementations
-│       └── SimpleSolver.*      SIMPLE, Rhie–Chow, and RANS assembly
+│   ├── flow/
+│   │   ├── BoundaryConditions.* Flow boundary-condition handling
+│   │   ├── TurbulenceModel.*   Standard k-epsilon and SST-2003 implementations
+│   │   └── SimpleSolver.*      SIMPLE, Rhie–Chow, and RANS assembly
+│   └── acoustic/
+│       ├── AcousticBoundaryConditions.* Acoustic patch parsing
+│       ├── AcousticSolver.*    Nodal dual-volume operators and time integration
+│       └── IMPLEMENTATION_PLAN.md Numerical implementation and verification plan
 ├── cases/
 │   ├── generate_meshes.py      Reproducible supplied Gmsh meshes
 │   ├── validate.py             Laminar conservation and benchmark checks
 │   ├── validate_turbulence.py  Turbulence runs, reference errors, and plots
+│   ├── generate_acoustic_meshes.py Mixed acoustic mesh generation
+│   ├── validate_acoustic.py    Analytical acoustic runs, metrics, and SVG plots
+│   ├── acoustic_*/             Cavity, plane-wave, convection, and absorption cases
+│   ├── cylinder_aeolian/       Transient cylinder flow to Curle-dipole acoustic propagation
+│   ├── run_cylinder_aeolian.py Hybrid flow/source/acoustic workflow and plots
 │   ├── cavity/                 Lid-driven cavity configuration and mesh
 │   ├── backstep/               Backward-facing step configuration and mesh
 │   ├── cylinder/               Flow-around-cylinder configuration and mesh
@@ -298,7 +322,7 @@ Turbulence lower bounds default to `minimum_k = 1e-12`, `minimum_epsilon = 1e-12
 └── validation/               Turbulence report, metrics, data, and figures
 ```
 
-Additional teaching material is under `textbook/` and `texbook-ppt/`. The empty physics directories are reserved for future development.
+Additional teaching material is under `textbook/` and `texbook-ppt/`. The elastic directory is reserved for future development.
 
 ## Prerequisites
 
@@ -376,6 +400,10 @@ Pass either a case directory or the full path to a `case.in` file:
 ./multiphysics cases/plate_sst_k_omega
 ./multiphysics cases/elbow_k_epsilon
 ./multiphysics cases/elbow_sst_k_omega
+./multiphysics cases/acoustic_cavity
+./multiphysics cases/acoustic_plane_wave
+./multiphysics cases/acoustic_convected
+./multiphysics cases/acoustic_absorbing
 ```
 
 Mesh and output paths in `case.in` are resolved relative to that case directory, not relative to the shell's working directory.
@@ -390,6 +418,8 @@ Run the solver directly, without `mpirun`; the current implementation intentiona
 | `make meshes` | Regenerate all supplied Gmsh meshes. This overwrites the generated `.msh` files. |
 | `make validate` | Run all laminar regressions and the complete plate/elbow turbulence matrix. |
 | `make validate-turbulence` | Run both models at all plate/elbow resolutions, check conservation and accuracy, and generate comparison data and SVG plots. |
+| `make validate-acoustic` | Run all analytical acoustic cases, check errors/reflection, and generate comparison data and SVG plots. |
+| `make cylinder-aeolian` | Run transient `Re = 150` cylinder flow, construct a Curle dipole from its force history, propagate the sound, and plot the results. |
 | `make clean` | Remove the executable and `build/`. It does not remove case results or `validation/`. |
 
 ## Case configuration
@@ -406,9 +436,10 @@ pressure = zeroGradient
 
 | Setting | Default | Meaning |
 |---|---:|---|
+| `physics` | `flow` | `flow` for incompressible SIMPLE or `acoustic` for the nodal acoustic solver. |
 | `mesh` | required | Gmsh file, relative to the case directory unless absolute. |
 | `output` | `results/flow.plt` | Tecplot output path. |
-| `time_scheme` | `steady` | `steady`, `euler`, `backward_euler`, or `bdf2`. |
+| `time_scheme` | `steady` | Flow: `steady`, `euler`, `backward_euler`, or `bdf2`. See the acoustic section for its schemes. |
 | `density` | `1.0` | Constant density \(\rho\). Must be positive. |
 | `viscosity` | `0.01` | Constant dynamic viscosity \(\mu\). |
 | `initial_velocity` | `0 0` | Initial cell velocity, two components. |
@@ -450,8 +481,13 @@ The outer `tolerance` and `continuity_tolerance` are absolute quantities. They s
 | `end_time` | `1.0` | Physical end time. |
 | `maximum_steps` | `1000000` | Safety limit on the number of time steps. |
 | `output_interval` | `10` | Write a Tecplot file every this many steps. |
+| `force_patch` | disabled | Physical patch on which to integrate pressure and viscous force. |
+| `force_output` | `results/forces.csv` | Force-history CSV path when `force_patch` is set. |
+| `force_reference_velocity` | `1.0` | Reference velocity for `Cd` and `Cl`. |
+| `force_reference_length` | `1.0` | Reference length/span for `Cd` and `Cl`. |
+| `output_vorticity` | `false` | Add cell-centered `dv/dx - du/dy` to Tecplot output. |
 
-The final step is shortened if necessary to finish exactly at `end_time`. Constant-step BDF2 is intended for a fixed `dt`; variable-step BDF2 coefficients are not yet implemented.
+The final step is shortened if necessary to finish exactly at `end_time`. Constant-step BDF2 is intended for a fixed `dt`; variable-step BDF2 coefficients are not yet implemented. Force histories include total, pressure, and viscous components. Coefficients use `0.5 * density * force_reference_velocity^2 * force_reference_length` as their normalization.
 
 ### Cavity example
 
@@ -486,7 +522,7 @@ pressure = zeroGradient
 
 ## Boundary conditions
 
-Every Gmsh physical boundary patch must have both a `velocity` and a `pressure` entry. Patch names in `case.in` must exactly match the mesh's physical names, including case.
+For flow cases, every Gmsh physical boundary patch must have both a `velocity` and a `pressure` entry. Acoustic patches require only their acoustic `pressure` entry, as described below. Patch names in `case.in` must exactly match the mesh's physical names, including case.
 
 ### Velocity conditions
 
@@ -525,6 +561,110 @@ pressure = fixedValue 0
 
 For a closed flow such as the cavity, all pressure boundaries can be `zeroGradient`; the solver then supplies the required discrete pressure reference.
 
+## Acoustic configuration
+
+Select the nodal mixed-grid solver with `physics = acoustic`. It uses the convected pressure-wave equation and median-dual control areas from `textbook/Chap5-4-acoustic.md`, not the cell-centered SIMPLE discretization. The implementation and verification plan is `src/acoustic/IMPLEMENTATION_PLAN.md`.
+
+### Main acoustic settings
+
+| Setting | Default | Meaning |
+|---|---:|---|
+| `density` | `1.0` | Uniform background density; must be positive. |
+| `sound_speed` | `1.0` | Uniform background sound speed \(c_0\); must be positive. |
+| `mean_velocity` | `0 0` | Uniform background velocity; `|u0| < c0` is required. |
+| `time_scheme` | `newmark` | `newmark` or `central_difference` (`central`/`explicit` aliases). |
+| `newmark_beta` | `0.25` | Newmark displacement coefficient; must be positive. |
+| `newmark_gamma` | `0.5` | Newmark velocity coefficient; must be positive. |
+| `dt` | automatic | Target maximum time step. If zero/negative, computed from `cfl`. |
+| `cfl` | `0.4` | Automatic-step Courant factor using minimum element edge and `c0 + |u0|`. |
+| `end_time` | `1.0` | Physical end time. The solver uses equal steps `end_time/ceil(end_time/dt)`. |
+| `output_interval` | final step | Write numbered Tecplot files every this many steps and at the final step. |
+| `probe_position` | disabled | Two coordinates; the nearest node is written to `<stem>_probe.csv`. |
+| `probe_positions` | disabled | Space-separated `x y` pairs; all nearest-node histories are written to `<stem>_probes.csv`. |
+| `acoustic_ksp` | `bcgs` | PETSc KSP for non-diagonal acoustic systems. |
+| `acoustic_pc` | `ilu` | PETSc preconditioner for non-diagonal acoustic systems. |
+| `linear_tolerance` | `1e-10` | PETSc relative residual tolerance. |
+| `linear_absolute_tolerance` | `1e-13` | PETSc absolute residual tolerance. |
+| `maximum_linear_iterations` | `1000` | Maximum PETSc iterations per time step. |
+
+### Initial conditions and sources
+
+`initial_condition` accepts `zero`, `cavity_mode`, `plane_wave`, or `gaussian_pulse`. Relevant settings are:
+
+| Setting | Default | Meaning |
+|---|---:|---|
+| `initial_amplitude` | `1.0` | Pressure amplitude for the selected analytical field. |
+| `initial_pressure` | `0.0` | Uniform pressure for `zero`. |
+| `initial_pressure_rate` | `0.0` | Uniform initial pressure rate; also used by `cavity_mode`. |
+| `mode_indices` | `2 1` | Non-negative integer cavity-mode indices, not both zero. Domain extents are inferred from the mesh. |
+| `wave_direction` | `1 0` | Plane-wave or pulse propagation direction; normalized internally. |
+| `wave_number` | `2*pi` | Plane-wave wavenumber magnitude. `omega = c0 |k| + u0·k`. |
+| `wave_phase` | `0.0` | Plane-wave initial phase in radians. |
+| `gaussian_center` | domain center | Two coordinates for the directed pulse center. |
+| `gaussian_width` | `0.1` | Gaussian standard deviation; must be positive. |
+| `source_type` | `none`/`harmonic` | `none`, `harmonic` monopole, or `flow_dipole` from a force-history CSV. Defaults to `harmonic` when `source_amplitude` is nonzero. |
+| `source_amplitude` | `0.0` | Integrated harmonic source amplitude; zero disables the source. |
+| `source_file` | required for `flow_dipole` | CSV with increasing `time`, `force_x`, and `force_y` columns, relative to the case directory. |
+| `source_scale` | `1.0` | Multiplier applied to the flow-force history. |
+| `source_ramp_time` | `0.0` | Cosine startup-ramp duration; zero disables ramping. |
+| `source_position` | domain center | Gaussian source center. |
+| `source_width` | `0.1` | Gaussian source standard deviation. |
+| `source_frequency` | `1.0` | Harmonic source frequency in cycles per unit time. |
+| `source_phase` | `0.0` | Harmonic source phase in radians. |
+
+The Gaussian source is normalized over nodal dual areas so its discrete weights sum to one. The directed Gaussian pulse uses `p_t = -(c0 + u0·n) n·grad(p)` initially. For `flow_dipole`, the implementation evaluates `div(F g / rho)`, where `F` is the force of the fluid on the body and the force of the body on the fluid is `-F`. `cases/run_cylinder_aeolian.py` supplies this convention after mean removal. If `end_time` is omitted for a flow dipole, the last source timestamp determines it.
+
+### Acoustic boundaries
+
+Every physical patch needs one `pressure` entry:
+
+```ini
+[boundary.left]
+pressure = planeWave
+
+[boundary.right]
+pressure = absorbing
+
+[boundary.bottom]
+pressure = rigid
+
+[boundary.top]
+pressure = fixedValue 0
+```
+
+- `rigid` (`hardWall`, `wall`, and `zeroGradient` aliases): zero normal acoustic flux.
+- `absorbing` (`nonreflecting`/`impedance` aliases): local outgoing characteristic relation. It is exact only in the normal-incidence cases for which it is derived; oblique and near-field reflection must be assessed separately.
+- `fixedValue p`: prescribed constant pressure with degree-of-freedom elimination.
+- `planeWave`: prescribed analytical pressure using the global wave settings; also provides consistent initial boundary rates/accelerations.
+
+### Cavity example
+
+```ini
+physics = acoustic
+mesh = mesh/medium_mixed.msh
+output = results/cavity.plt
+density = 1.0
+sound_speed = 1.0
+mean_velocity = 0 0
+time_scheme = central_difference
+dt = 0.005
+end_time = 1.4142135623730951
+initial_condition = cavity_mode
+mode_indices = 2 1
+probe_position = 0.25 0.25
+
+[boundary.left]
+pressure = rigid
+[boundary.right]
+pressure = rigid
+[boundary.bottom]
+pressure = rigid
+[boundary.top]
+pressure = rigid
+```
+
+Acoustic Tecplot zones contain nodal `p`, `p_t`, `p_tt`, and `dual_area`. Each run also writes `<stem>_summary.csv` with pressure extrema, quadratic energy, linear diagnostics, and Courant number, plus `<stem>_geometry.csv` with element area closure and `sum(grad N)` checks.
+
 ## Gmsh meshes
 
 ### Supported input
@@ -539,15 +679,13 @@ Curved/high-order elements, binary Gmsh files, three-dimensional elements, and m
 
 ### Supplied meshes
 
-Regenerate all three meshes with:
+Regenerate the flow and acoustic meshes with:
 
 ```bash
-python3 cases/generate_meshes.py
-# or
 make meshes
 ```
 
-The generator uses only Python's standard library and writes ASCII Gmsh 2.2 files.
+Alternatively, run `python3 cases/generate_meshes.py` for flow or `python3 cases/generate_acoustic_meshes.py` for acoustics. The generators use only Python's standard library and write ASCII Gmsh 2.2 files.
 
 | Case | Geometry and mesh |
 |---|---|
@@ -571,6 +709,7 @@ The default output is ASCII Tecplot. Nodal coordinates and cell-centered fields 
 | `U_x`, `U_y` | Cell centres | Velocity components. |
 | `p` | Cell centres | Static pressure. |
 | `mass_imbalance` | Cell centres | Signed integrated cell mass imbalance in the current mass-flux units. |
+| `vorticity` | Cell centres | `dv/dx - du/dy`, enabled by `output_vorticity = true`. |
 | `k` | Cell centres | Turbulent kinetic energy, for turbulent cases. |
 | `epsilon` | Cell centres | Dissipation, for `k_epsilon`. |
 | `omega` | Cell centres | Specific dissipation, for SST. |
@@ -648,6 +787,24 @@ The flat-plate study compares both models with NASA's Kármán–Schoenherr \(C_
 
 The reference files, digitization uncertainty, and source URLs are under `reference/`. See `validation/turbulence_validation.md` for final values, grid sensitivity, cap usage, and the limitations of comparing a 2D elbow with a 3D pipe experiment.
 
+### Acoustic analytical validation
+
+Run `make validate-acoustic` for 14 cavity, plane-wave, mean-flow, and pulse/outlet runs on triangle, quadrilateral, and mixed grids. The driver checks geometry closure, analytical field and frequency errors, grid convergence, energy drift, and outlet reflection. It writes `validation/acoustic_metrics.csv`, comparison CSVs under `validation/data/`, and SVG contours/profiles under `validation/figures/`.
+
+| Finest-grid or refined case | Selected result |
+|---|---|
+| Rigid cavity `(2,1)` mode | Relative L2 error `0.06281%`; observed grid orders `1.954`, `2.239` |
+| Stationary plane wave | Relative L2 error `0.10500%`; phase speed `0.999696` versus exact `1` |
+| Plane wave with `M = 0.3` | Relative L2 error `0.24392%`; phase speed `1.299116` versus exact `1.3` |
+| Gaussian pulse at `t = 1` | Relative L2 error `2.05364%` |
+| Absorbing versus rigid outlet | Reflected/incident peak ratios `0.234999%` versus `99.558540%` |
+
+See `validation/acoustic_validation.md` for the complete metrics, contours, comparison plots, acceptance criteria, references, and limitations. `make validate` runs these checks after the existing laminar and turbulence regressions.
+
+### Cylinder vortex shedding and aeolian tone
+
+`make cylinder-aeolian` runs the hybrid case under `cases/cylinder_aeolian/`: transient `Re = 150` flow, force-history extraction over three measured shedding periods, and acoustic propagation at `M = 0.2`. The workflow compares `St`, mean `Cd`, lift amplitude, and drag second harmonic with Inoue and Hatakeyama's published values and checks transverse-dipole directivity. Case equations, source conventions, commands, and limitations are in `cases/cylinder_aeolian/README.md`; final metrics and figures are described in `validation/cylinder_aeolian.md`.
+
 ## Adding a new case
 
 1. Create a directory under `cases/`.
@@ -689,7 +846,7 @@ public:
 };
 ```
 
-At present, `src/main.cpp` directly constructs `SimpleSolver`. A general physics-selection mechanism and inter-solver field exchange still need to be added before this becomes a coupled multiphysics executable.
+`src/main.cpp` selects `SimpleSolver` or `AcousticSolver` from `physics` in `case.in`. Inter-solver field exchange and coupled scheduling still need to be added before this becomes a coupled multiphysics executable.
 
 ## Current limitations
 
@@ -698,8 +855,9 @@ At present, `src/main.cpp` directly constructs `SimpleSolver`. A general physics
 - Constant density and dynamic viscosity.
 - Two-dimensional RANS only: three-dimensional secondary flow, swirl, and cross-sectional Dean vortices cannot be represented.
 - Only standard \(k\)-\(\varepsilon\) and SST-2003; no transition, compressibility, buoyancy, curvature/rotation correction, DES, or Reynolds-stress model.
-- No elastic or acoustic field solver yet.
-- No fluid–structure or fluid–acoustic coupling yet.
+- No elastic field solver, fluid–structure coupling, or two-way fluid–acoustic coupling yet. The cylinder case is one-way Curle-type coupling.
+- Acoustic media and mean flow are currently uniform and steady; the implementation requires `|M| < 1`.
+- Acoustic absorption is a local first-order condition, not a PML; general frequency-dependent impedance and frequency-domain Helmholtz solves are not implemented.
 - No convection limiter, so central reconstruction can produce oscillations in strongly convection-dominated or poor-quality-mesh cases.
 - No curved/high-order Gmsh element support.
 - No binary Gmsh input or binary Tecplot output.
@@ -713,12 +871,12 @@ At present, `src/main.cpp` directly constructs `SimpleSolver`. A general physics
 ### Physics modules and multiphysics coupling
 
 - [ ] Implement the two-dimensional elastic solid solver, including displacement, stress, traction, and fixed-displacement boundaries.
-- [ ] Implement the two-dimensional acoustic solver with appropriate pressure/velocity or displacement-potential formulation.
-- [ ] Add configuration-driven physics selection instead of directly constructing `SimpleSolver` in `main.cpp`.
+- [x] Implement the two-dimensional acoustic solver with nodal pressure and dual-control-volume fluxes.
+- [x] Add configuration-driven physics selection in `main.cpp`.
 - [ ] Design shared field registration and solver scheduling for coupled calculations.
 - [ ] Add conservative field/force interpolation between different physics meshes.
 - [ ] Implement fluid–structure interface conditions and an explicit or partitioned fluid–structure coupling algorithm.
-- [ ] Add acoustic radiation, impedance, and non-reflecting boundary conditions.
+- [ ] Add PML, frequency-dependent impedance, vibrating-wall input, and frequency-domain acoustic solutions.
 - [ ] Investigate strong/monolithic coupling where explicit partitioned coupling is unstable.
 
 ### Mesh and geometry

@@ -1,0 +1,52 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="690" viewBox="0 0 1200 690" role="img" aria-labelledby="title desc">
+  <title id="title">对流格式的界面取值</title>
+  <desc id="desc">正向流动下比较中心格式、一阶迎风、二阶迎风和QUICK所使用的单元模板及界面公式</desc>
+  <defs>
+    <marker id="flow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9" orient="auto"><path d="M0 0L10 5L0 10Z" fill="#287fad"/></marker>
+    <style>
+      text{font-family:"Microsoft YaHei","Noto Sans CJK SC",sans-serif;fill:#203040}
+      .grid{stroke:#aab9c5;stroke-width:2}.node{fill:#536b7e}.used{fill:#c45154;stroke:white;stroke-width:2}
+      .rowtitle{font-size:23px;font-weight:700}.formula{font-size:21px}.note{font-size:17px;fill:#607283}
+    </style>
+  </defs>
+  <rect width="1200" height="690" fill="#fbfcfe"/>
+  <text x="600" y="43" text-anchor="middle" font-size="27" font-weight="700">正向流动 Ff &gt; 0：界面值从哪里获得？</text>
+  <line x1="320" y1="78" x2="840" y2="78" stroke="#287fad" stroke-width="4" marker-end="url(#flow)"/>
+  <text x="580" y="68" text-anchor="middle" font-size="19" fill="#287fad">流动方向</text>
+  <g transform="translate(0 115)">
+    <rect x="25" y="-25" width="1150" height="120" rx="16" fill="#eef5fa"/>
+    <text class="rowtitle" x="55" y="18">中心格式</text><text class="note" x="55" y="49">界面两侧线性插值</text>
+    <line class="grid" x1="340" y1="35" x2="820" y2="35"/><line x1="580" y1="2" x2="580" y2="68" stroke="#287fad" stroke-width="4"/>
+    <circle class="node" cx="340" cy="35" r="7"/><circle class="used" cx="460" cy="35" r="9"/><circle class="used" cx="700" cy="35" r="9"/><circle class="node" cx="820" cy="35" r="7"/>
+    <text x="340" y="82" text-anchor="middle" font-size="19">W</text><text x="460" y="82" text-anchor="middle" font-size="19">P</text><text x="580" y="88" text-anchor="middle" font-size="19" fill="#287fad">f</text><text x="700" y="82" text-anchor="middle" font-size="19">E</text><text x="820" y="82" text-anchor="middle" font-size="19">EE</text>
+    <text class="formula" x="865" y="31">φf = ½(φP + φE)</text><text class="note" x="865" y="60">二阶、低耗散；高 Pe 下可能振荡</text>
+  </g>
+  <g transform="translate(0 250)">
+    <rect x="25" y="-25" width="1150" height="120" rx="16" fill="#fff4e4"/>
+    <text class="rowtitle" x="55" y="18">一阶迎风</text><text class="note" x="55" y="49">直接采用上游单元值</text>
+    <line class="grid" x1="340" y1="35" x2="820" y2="35"/><line x1="580" y1="2" x2="580" y2="68" stroke="#287fad" stroke-width="4"/>
+    <circle class="node" cx="340" cy="35" r="7"/><circle class="used" cx="460" cy="35" r="10"/><circle class="node" cx="700" cy="35" r="7"/><circle class="node" cx="820" cy="35" r="7"/>
+    <path d="M460 10Q515 -5 570 25" fill="none" stroke="#c45154" stroke-width="3" marker-end="url(#flow)"/>
+    <text x="340" y="82" text-anchor="middle" font-size="19">W</text><text x="460" y="82" text-anchor="middle" font-size="19">P（上游）</text><text x="580" y="88" text-anchor="middle" font-size="19" fill="#287fad">f</text><text x="700" y="82" text-anchor="middle" font-size="19">E</text><text x="820" y="82" text-anchor="middle" font-size="19">EE</text>
+    <text class="formula" x="865" y="31">φf = φP</text><text class="note" x="865" y="60">有界、稳健；数值扩散较明显</text>
+  </g>
+  <g transform="translate(0 385)">
+    <rect x="25" y="-25" width="1150" height="120" rx="16" fill="#eef7ef"/>
+    <text class="rowtitle" x="55" y="18">二阶迎风</text><text class="note" x="55" y="49">利用上游梯度线性外推</text>
+    <line class="grid" x1="340" y1="35" x2="820" y2="35"/><line x1="580" y1="2" x2="580" y2="68" stroke="#287fad" stroke-width="4"/>
+    <circle class="used" cx="340" cy="35" r="9"/><circle class="used" cx="460" cy="35" r="9"/><circle class="node" cx="700" cy="35" r="7"/><circle class="node" cx="820" cy="35" r="7"/>
+    <path d="M340 12L575 12" stroke="#c45154" stroke-width="3"/><path d="M575 12L600 12" stroke="#c45154" stroke-width="3" stroke-dasharray="5 4"/>
+    <text x="340" y="82" text-anchor="middle" font-size="19">W</text><text x="460" y="82" text-anchor="middle" font-size="19">P</text><text x="580" y="88" text-anchor="middle" font-size="19" fill="#287fad">f</text><text x="700" y="82" text-anchor="middle" font-size="19">E</text><text x="820" y="82" text-anchor="middle" font-size="19">EE</text>
+    <text class="formula" x="865" y="25">φf = 3/2 φP − 1/2 φW</text><text class="note" x="865" y="58">光滑区二阶；需要限制越界</text>
+  </g>
+  <g transform="translate(0 520)">
+    <rect x="25" y="-25" width="1150" height="120" rx="16" fill="#f4eff9"/>
+    <text class="rowtitle" x="55" y="18">QUICK</text><text class="note" x="55" y="49">二次上游插值，模板更宽</text>
+    <line class="grid" x1="340" y1="35" x2="820" y2="35"/><line x1="580" y1="2" x2="580" y2="68" stroke="#287fad" stroke-width="4"/>
+    <circle class="used" cx="340" cy="35" r="9"/><circle class="used" cx="460" cy="35" r="9"/><circle class="used" cx="700" cy="35" r="9"/><circle class="node" cx="820" cy="35" r="7"/>
+    <path d="M340 5Q500 -25 700 5" fill="none" stroke="#8565ae" stroke-width="3"/>
+    <text x="340" y="82" text-anchor="middle" font-size="19">W</text><text x="460" y="82" text-anchor="middle" font-size="19">P</text><text x="580" y="88" text-anchor="middle" font-size="19" fill="#287fad">f</text><text x="700" y="82" text-anchor="middle" font-size="19">E</text><text x="820" y="82" text-anchor="middle" font-size="19">EE</text>
+    <text class="formula" x="865" y="25">φf = 6/8 φP + 3/8 φE − 1/8 φW</text><text class="note" x="865" y="58">高阶、低耗散；无自动有界保证</text>
+  </g>
+  <text x="600" y="665" text-anchor="middle" font-size="18" fill="#607283">红色节点表示参与界面取值；Ff 反向时，上游侧和迎风模板随之反转</text>
+</svg>

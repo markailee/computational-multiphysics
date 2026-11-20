@@ -47,6 +47,15 @@ SimpleSolver::SimpleSolver(const Mesh& mesh, const Config& config, std::filesyst
     }
     turbulence_ = makeTurbulenceModel(mesh_, config_, boundaryConditions_, density_, viscosity_);
     if (turbulence_) std::cout << "Turbulence model: " << turbulence_->name() << '\n';
+    if (config.has("force_patch")) {
+        forcePatch_ = mesh_.patchIndex(config.require("force_patch"));
+        if (forcePatch_ < 0) throw std::runtime_error("Unknown force_patch: " + config.require("force_patch"));
+        forceReferenceVelocity_ = config.number("force_reference_velocity", 1.0);
+        forceReferenceLength_ = config.number("force_reference_length", 1.0);
+        if (forceReferenceVelocity_ <= 0.0 || forceReferenceLength_ <= 0.0) {
+            throw std::runtime_error("Force reference velocity and length must be positive");
+        }
+    }
 }
 
 void SimpleSolver::initialize() {
@@ -363,6 +372,46 @@ void SimpleSolver::updateTimeHistory() {
     hasOldOldVelocity_ = true;
 }
 
+FlowForceDiagnostics SimpleSolver::forceDiagnostics() const {
+    FlowForceDiagnostics result;
+    if (forcePatch_ < 0) return result;
+    const std::vector<VectorGradient> velocityGradient = gradient_->vector(velocity_);
+    for (int faceIndex : mesh_.patches[forcePatch_].faces) {
+        const Face& face = mesh_.faces[faceIndex];
+        const auto& gradient = velocityGradient[face.owner];
+        Vector2 viscousTraction;
+        for (int component = 0; component < 2; ++component) {
+            const double transpose = gradient[0][component] * face.normal.x + gradient[1][component] * face.normal.y;
+            viscousTraction[component] = viscosity_ * face.area *
+                (dot(gradient[component], face.normal) + transpose);
+        }
+        result.pressure += face.normal * (pressure_.boundary(faceIndex) * face.area);
+        result.viscous -= viscousTraction;
+    }
+    result.total = result.pressure + result.viscous;
+    return result;
+}
+
+std::filesystem::path SimpleSolver::forceFile() const {
+    std::filesystem::path output = config_.get("force_output", "results/forces.csv");
+    return output.is_absolute() ? output : caseDirectory_ / output;
+}
+
+void SimpleSolver::writeForceHistory(const std::filesystem::path& file, double time, bool append) const {
+    const FlowForceDiagnostics force = forceDiagnostics();
+    const double dynamicPressure = 0.5 * density_ * forceReferenceVelocity_ * forceReferenceVelocity_ * forceReferenceLength_;
+    std::filesystem::create_directories(file.parent_path());
+    std::ofstream output(file, append ? std::ios::app : std::ios::trunc);
+    if (!output) throw std::runtime_error("Cannot write flow force history: " + file.string());
+    output << std::setprecision(12) << std::scientific;
+    if (!append) {
+        output << "time,force_x,force_y,pressure_force_x,pressure_force_y,viscous_force_x,viscous_force_y,cd,cl\n";
+    }
+    output << time << ',' << force.total.x << ',' << force.total.y << ','
+           << force.pressure.x << ',' << force.pressure.y << ',' << force.viscous.x << ',' << force.viscous.y << ','
+           << force.total.x / dynamicPressure << ',' << force.total.y / dynamicPressure << '\n';
+}
+
 std::filesystem::path SimpleSolver::outputFile() const {
     std::filesystem::path output = config_.get("output", "results/flow.plt");
     return output.is_absolute() ? output : caseDirectory_ / output;
@@ -372,6 +421,14 @@ void SimpleSolver::write(const std::filesystem::path& file) const {
     ScalarField imbalance("mass_imbalance", mesh_);
     imbalance.values() = cellImbalance();
     std::map<std::string, const ScalarField*> scalars{{"p", &pressure_}, {"mass_imbalance", &imbalance}};
+    ScalarField vorticity("vorticity", mesh_);
+    if (config_.boolean("output_vorticity", false)) {
+        const std::vector<VectorGradient> gradient = gradient_->vector(velocity_);
+        for (std::size_t cell = 0; cell < mesh_.cells.size(); ++cell) {
+            vorticity[cell] = gradient[cell][1].x - gradient[cell][0].y;
+        }
+        scalars["vorticity"] = &vorticity;
+    }
     if (turbulence_) {
         scalars["k"] = &turbulence_->k();
         scalars[turbulence_->scale().name()] = &turbulence_->scale();
@@ -424,6 +481,7 @@ void SimpleSolver::run() {
         const FlowDiagnostics result = solveStep(0.0, config_.integer("maximum_iterations", 2000));
         write(output);
         writeSummary(summary, 0.0, result, false);
+        if (forcePatch_ >= 0) writeForceHistory(forceFile(), 0.0, false);
         std::cout << "Tecplot output: " << output << '\n';
         if (!result.converged) throw std::runtime_error("Steady SIMPLE iteration did not converge; output was written for diagnosis");
         return;
@@ -435,8 +493,13 @@ void SimpleSolver::run() {
     const int outputInterval = config_.integer("output_interval", 10);
     if (dt <= 0.0 || endTime <= 0.0) throw std::runtime_error("dt and end_time must be positive");
     bool wroteSummary = false;
+    if (forcePatch_ >= 0) writeForceHistory(forceFile(), currentTime_, false);
     int step = 0;
     while (currentTime_ < endTime - 1.0e-12 && step < maximumSteps) {
+        if (endTime - currentTime_ <= 1.0e-8 * dt) {
+            currentTime_ = endTime;
+            break;
+        }
         const double stepSize = std::min(dt, endTime - currentTime_);
         const FlowDiagnostics result = solveStep(stepSize, config_.integer("maximum_iterations", 100));
         currentTime_ += stepSize;
@@ -444,6 +507,7 @@ void SimpleSolver::run() {
         updateTimeHistory();
         writeSummary(summary, currentTime_, result, wroteSummary);
         wroteSummary = true;
+        if (forcePatch_ >= 0) writeForceHistory(forceFile(), currentTime_, true);
         if (step % outputInterval == 0 || currentTime_ >= endTime - 1.0e-12) {
             const std::filesystem::path stepFile = output.parent_path() /
                 (output.stem().string() + "_" + std::to_string(step) + output.extension().string());

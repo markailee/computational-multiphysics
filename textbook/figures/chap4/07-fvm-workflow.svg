@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="930" viewBox="0 0 1200 930" role="img" aria-labelledby="title desc">
+  <title id="title">有限体积法完整计算流程</title>
+  <desc id="desc">从网格与初始化进入时间循环，在非线性外迭代中更新系数、组装并求解线性系统，最后进行守恒和网格验证</desc>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M0 0L10 5L0 10Z" fill="#536f84"/></marker>
+    <style>
+      text{font-family:"Microsoft YaHei","Noto Sans CJK SC",sans-serif;fill:#203040}
+      .box{stroke-width:2.5;rx:16}.title{font-size:22px;font-weight:700;text-anchor:middle}.sub{font-size:17px;text-anchor:middle;fill:#526779}
+      .decision{fill:#fff4df;stroke:#ca8229;stroke-width:2.5}.arrow{fill:none;stroke:#536f84;stroke-width:3;marker-end:url(#arrow)}
+    </style>
+  </defs>
+  <rect width="1200" height="930" fill="#fbfcfe"/>
+  <text x="600" y="42" text-anchor="middle" font-size="27" font-weight="700">隐式有限体积计算的三层循环</text>
+  <rect class="box" x="280" y="72" width="640" height="70" fill="#e8f2fa" stroke="#477795"/>
+  <text class="title" x="600" y="102">网格、物性、初值与边界条件</text><text class="sub" x="600" y="129">预计算 VP、Af、dPN，检查闭合性和法向</text>
+  <path class="arrow" d="M600 142V169"/>
+  <rect class="box" x="280" y="175" width="640" height="65" fill="#eaf5f0" stroke="#47836b"/>
+  <text class="title" x="600" y="204">开始时间步 n → n+1</text><text class="sub" x="600" y="229">保存 φn；稳态计算可省略时间推进</text>
+  <path class="arrow" d="M600 240V267"/>
+  <rect class="box" x="200" y="273" width="800" height="65" fill="#f3eef8" stroke="#8263a5"/>
+  <text class="title" x="600" y="302">开始非线性外迭代</text><text class="sub" x="600" y="327">更新梯度、物性、质量流量、源项线性化和延迟修正</text>
+  <path class="arrow" d="M600 338V365"/>
+  <rect class="box" x="200" y="371" width="800" height="80" fill="#fff4e4" stroke="#c88731"/>
+  <text class="title" x="600" y="402">基于界面组装 Aφ = b</text><text class="sub" x="600" y="429">内部界面一次计算、双端累加；随后施加边界条件</text>
+  <path class="arrow" d="M600 451V478"/>
+  <rect class="box" x="280" y="484" width="640" height="65" fill="#fceded" stroke="#b75d5d"/>
+  <text class="title" x="600" y="513">线性内迭代：求解当前系统</text><text class="sub" x="600" y="538">选择 TDMA、Krylov、AMG 等，并检查归一化残差</text>
+  <path class="arrow" d="M600 549V576"/>
+  <polygon class="decision" points="600,582 815,650 600,718 385,650"/>
+  <text class="title" x="600" y="642">外迭代收敛？</text><text class="sub" x="600" y="671">残差 + 守恒 + 积分量</text>
+  <path class="arrow" d="M385 650H140V305H190"/>
+  <text x="205" y="634" font-size="19" fill="#9b5f18">否：更新系数与延迟项</text>
+  <path class="arrow" d="M600 718V750"/>
+  <text x="621" y="742" font-size="19" fill="#386e58">是</text>
+  <polygon class="decision" points="600,755 800,815 600,875 400,815"/>
+  <text class="title" x="600" y="808">达到终止时间？</text><text class="sub" x="600" y="837">或稳态迭代完成</text>
+  <path class="arrow" d="M400 815H75V207H270"/>
+  <text x="103" y="797" font-size="19" fill="#386e58">否：推进 φn = φ</text>
+  <path class="arrow" d="M800 815H1065V730"/>
+  <text x="825" y="800" font-size="19" fill="#386e58">是</text>
+  <rect class="box" x="885" y="555" width="270" height="170" fill="#e7f1f5" stroke="#397c90"/>
+  <text class="title" x="1020" y="590">结果验证</text>
+  <text class="sub" x="1020" y="622">全局守恒</text><text class="sub" x="1020" y="650">网格与时间步收敛</text><text class="sub" x="1020" y="678">物理合理性与不确定度</text><text class="sub" x="1020" y="706">输出可信结果</text>
+  <text x="1030" y="465" text-anchor="middle" font-size="18" fill="#8263a5">外迭代</text>
+  <text x="1030" y="493" text-anchor="middle" font-size="18" fill="#b75d5d">└ 内迭代</text>
+  <text x="1030" y="521" text-anchor="middle" font-size="18" fill="#47836b">时间步包裹外迭代</text>
+</svg>

@@ -1,0 +1,2 @@
+shedding_period,strouhal,strouhal_reference,mean_cd,mean_cd_reference,lift_amplitude,lift_amplitude_reference,lift_fundamental_amplitude,drag_second_harmonic_amplitude,acoustic_transverse_amplitude,acoustic_axial_amplitude,acoustic_directivity_ratio
+5.109473848473328,0.19571486803847568,0.183,1.5514392457213038,1.32,0.5923948599148501,0.52,0.5812236428487871,0.03935779107674351,0.009184281655507415,1.6850561354703203e-05,545.0430678348865

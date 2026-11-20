@@ -1,0 +1,52 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="390" viewBox="0 0 1200 390" role="img" aria-labelledby="title desc">
+  <title id="title">有限体积法知识路线</title>
+  <desc id="desc">从连续守恒定律、网格几何、界面通量、单元系数、线性求解到数值验证的六个阶段</desc>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0 0L10 5L0 10Z" fill="#52708a"/></marker>
+    <style>
+      text{font-family:"Microsoft YaHei","Noto Sans CJK SC",sans-serif;fill:#203040}
+      .box{stroke-width:2;rx:18}
+      .head{font-size:23px;font-weight:700;text-anchor:middle}
+      .sub{font-size:17px;text-anchor:middle;fill:#4b5d6c}
+      .num{font-size:17px;font-weight:700;fill:white;text-anchor:middle}
+    </style>
+  </defs>
+  <rect width="1200" height="390" fill="#fbfcfe"/>
+  <text x="600" y="43" text-anchor="middle" font-size="27" font-weight="700">从守恒定律到可信数值解</text>
+  <text x="600" y="73" text-anchor="middle" font-size="17" fill="#637689">每一层都保留上一层的物理结构，同时引入需要检验的近似</text>
+  <g transform="translate(30 115)">
+    <rect class="box" width="170" height="135" fill="#e7f1fb" stroke="#4583b8"/>
+    <circle cx="28" cy="25" r="16" fill="#4583b8"/><text class="num" x="28" y="31">1</text>
+    <text class="head" x="85" y="63">连续守恒</text><text class="sub" x="85" y="94">输运方程</text><text class="sub" x="85" y="119">散度定理</text>
+  </g>
+  <g transform="translate(222 115)">
+    <rect class="box" width="170" height="135" fill="#e9f6f1" stroke="#3d9276"/>
+    <circle cx="28" cy="25" r="16" fill="#3d9276"/><text class="num" x="28" y="31">2</text>
+    <text class="head" x="85" y="63">网格几何</text><text class="sub" x="85" y="94">单元与界面</text><text class="sub" x="85" y="119">法向与距离</text>
+  </g>
+  <g transform="translate(414 115)">
+    <rect class="box" width="170" height="135" fill="#fff4df" stroke="#cf8a2c"/>
+    <circle cx="28" cy="25" r="16" fill="#cf8a2c"/><text class="num" x="28" y="31">3</text>
+    <text class="head" x="85" y="63">界面通量</text><text class="sub" x="85" y="94">对流与扩散</text><text class="sub" x="85" y="119">精度与有界性</text>
+  </g>
+  <g transform="translate(606 115)">
+    <rect class="box" width="170" height="135" fill="#f2ecfa" stroke="#8565ae"/>
+    <circle cx="28" cy="25" r="16" fill="#8565ae"/><text class="num" x="28" y="31">4</text>
+    <text class="head" x="85" y="63">系数组装</text><text class="sub" x="85" y="94">aP、aNB、bP</text><text class="sub" x="85" y="119">边界与源项</text>
+  </g>
+  <g transform="translate(798 115)">
+    <rect class="box" width="170" height="135" fill="#fceded" stroke="#bb6060"/>
+    <circle cx="28" cy="25" r="16" fill="#bb6060"/><text class="num" x="28" y="31">5</text>
+    <text class="head" x="85" y="63">方程求解</text><text class="sub" x="85" y="94">稀疏线性系统</text><text class="sub" x="85" y="119">内迭代与外迭代</text>
+  </g>
+  <g transform="translate(990 115)">
+    <rect class="box" width="180" height="135" fill="#eaf3f7" stroke="#387c91"/>
+    <circle cx="28" cy="25" r="16" fill="#387c91"/><text class="num" x="28" y="31">6</text>
+    <text class="head" x="90" y="63">数值验证</text><text class="sub" x="90" y="94">守恒与残差</text><text class="sub" x="90" y="119">网格和时间步</text>
+  </g>
+  <g stroke="#52708a" stroke-width="3" marker-end="url(#arrow)">
+    <path d="M201 182H215"/><path d="M393 182H407"/><path d="M585 182H599"/><path d="M777 182H791"/><path d="M969 182H983"/>
+  </g>
+  <path d="M1080 270V320Q1080 343 1055 343H500Q475 343 475 320V276" fill="none" stroke="#8497a8" stroke-width="2.5" stroke-dasharray="8 6" marker-end="url(#arrow)"/>
+  <text x="780" y="333" text-anchor="middle" font-size="17" fill="#637689">验证发现误差时，回到相应近似层排查</text>
+</svg>

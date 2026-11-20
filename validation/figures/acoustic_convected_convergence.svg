@@ -1,0 +1,34 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="500" viewBox="0 0 900 500">
+<rect width="100%" height="100%" fill="white"/>
+<text x="450.0" y="28" text-anchor="middle" font-family="sans-serif" font-size="19">convected grid convergence</text>
+<line x1="80.00" y1="55" x2="80.00" y2="435" stroke="#e5e5e5"/>
+<line x1="80" y1="435.00" x2="870" y2="435.00" stroke="#e5e5e5"/>
+<text x="80.00" y="455" text-anchor="middle" font-family="sans-serif" font-size="11">0.0125</text>
+<text x="72" y="439.00" text-anchor="end" font-family="sans-serif" font-size="11">-0.000531</text>
+<line x1="238.00" y1="55" x2="238.00" y2="435" stroke="#e5e5e5"/>
+<line x1="80" y1="359.00" x2="870" y2="359.00" stroke="#e5e5e5"/>
+<text x="238.00" y="455" text-anchor="middle" font-family="sans-serif" font-size="11">0.02</text>
+<text x="72" y="363.00" text-anchor="end" font-family="sans-serif" font-size="11">0.00808</text>
+<line x1="396.00" y1="55" x2="396.00" y2="435" stroke="#e5e5e5"/>
+<line x1="80" y1="283.00" x2="870" y2="283.00" stroke="#e5e5e5"/>
+<text x="396.00" y="455" text-anchor="middle" font-family="sans-serif" font-size="11">0.0275</text>
+<text x="72" y="287.00" text-anchor="end" font-family="sans-serif" font-size="11">0.0167</text>
+<line x1="554.00" y1="55" x2="554.00" y2="435" stroke="#e5e5e5"/>
+<line x1="80" y1="207.00" x2="870" y2="207.00" stroke="#e5e5e5"/>
+<text x="554.00" y="455" text-anchor="middle" font-family="sans-serif" font-size="11">0.035</text>
+<text x="72" y="211.00" text-anchor="end" font-family="sans-serif" font-size="11">0.0253</text>
+<line x1="712.00" y1="55" x2="712.00" y2="435" stroke="#e5e5e5"/>
+<line x1="80" y1="131.00" x2="870" y2="131.00" stroke="#e5e5e5"/>
+<text x="712.00" y="455" text-anchor="middle" font-family="sans-serif" font-size="11">0.0425</text>
+<text x="72" y="135.00" text-anchor="end" font-family="sans-serif" font-size="11">0.0339</text>
+<line x1="870.00" y1="55" x2="870.00" y2="435" stroke="#e5e5e5"/>
+<line x1="80" y1="55.00" x2="870" y2="55.00" stroke="#e5e5e5"/>
+<text x="870.00" y="455" text-anchor="middle" font-family="sans-serif" font-size="11">0.05</text>
+<text x="72" y="59.00" text-anchor="end" font-family="sans-serif" font-size="11">0.0425</text>
+<rect x="80" y="55" width="790" height="380" fill="none" stroke="#333"/>
+<polyline points="80.00,408.79 343.33,344.08 870.00,81.21" fill="none" stroke="#2166ac" stroke-width="1.8"/>
+<text x="450.0" y="485" text-anchor="middle" font-family="sans-serif" font-size="14">mesh spacing h</text>
+<text x="18" y="250.0" text-anchor="middle" transform="rotate(-90 18 250.0)" font-family="sans-serif" font-size="14">relative L2 error</text>
+<line x1="690" y1="75" x2="718" y2="75" stroke="#2166ac" stroke-width="2"/>
+<text x="725" y="79" font-family="sans-serif" font-size="12">Relative L2 error</text>
+</svg>

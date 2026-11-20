@@ -1,0 +1,47 @@
+physics = flow
+mesh = ../cylinder/mesh/cylinder.msh
+output = results/flow.plt
+
+time_scheme = bdf2
+dt = 0.02
+end_time = 100.0
+maximum_steps = 10000
+output_interval = 250
+log_interval = 100
+
+density = 1.0
+viscosity = 0.006666666666666667
+initial_velocity = 1 0.01
+initial_pressure = 0.0
+gradient = least_squares
+convection_blending = 1.0
+velocity_relaxation = 0.7
+pressure_relaxation = 0.3
+maximum_iterations = 100
+tolerance = 1.0e-5
+continuity_tolerance = 1.0e-8
+linear_tolerance = 1.0e-9
+linear_absolute_tolerance = 1.0e-12
+maximum_linear_iterations = 1000
+
+force_patch = cylinder
+force_output = results/flow_forces.csv
+force_reference_velocity = 1.0
+force_reference_length = 1.0
+output_vorticity = true
+
+[boundary.inlet]
+velocity = fixedValue 1 0
+pressure = zeroGradient
+
+[boundary.outlet]
+velocity = zeroGradient
+pressure = fixedValue 0
+
+[boundary.topBottom]
+velocity = fixedValue 1 0
+pressure = zeroGradient
+
+[boundary.cylinder]
+velocity = noSlip
+pressure = zeroGradient

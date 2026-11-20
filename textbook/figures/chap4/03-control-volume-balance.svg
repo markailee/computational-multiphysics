@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="610" viewBox="0 0 1200 610" role="img" aria-labelledby="title desc">
+  <title id="title">控制体通量平衡</title>
+  <desc id="desc">控制体P通过对流和扩散与相邻单元交换守恒量，同时包含源项和非稳态存储</desc>
+  <defs>
+    <marker id="blue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9" orient="auto"><path d="M0 0L10 5L0 10Z" fill="#287fad"/></marker>
+    <marker id="orange" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9" orient="auto"><path d="M0 0L10 5L0 10Z" fill="#d17a28"/></marker>
+    <style>text{font-family:"Microsoft YaHei","Noto Sans CJK SC",sans-serif;fill:#203040}.small{font-size:19px;fill:#526779}.head{font-size:24px;font-weight:700}</style>
+  </defs>
+  <rect width="1200" height="610" fill="#fbfcfe"/>
+  <text x="600" y="46" text-anchor="middle" font-size="27" font-weight="700">控制体 P 的守恒记账</text>
+  <polygon points="445,160 660,135 785,270 710,445 480,460 365,310" fill="#e8f2fa" stroke="#476f8c" stroke-width="4"/>
+  <circle cx="575" cy="300" r="9" fill="#b94e53"/>
+  <text x="575" y="285" text-anchor="middle" class="head">P</text>
+  <text x="575" y="329" text-anchor="middle" font-size="22">φP，VP</text>
+  <g fill="#f2f5f7" stroke="#9babb7" stroke-width="2">
+    <polygon points="190,145 370,170 365,310 190,325"/><polygon points="660,80 840,100 905,250 785,270 660,135"/>
+    <polygon points="785,270 930,300 880,475 710,445"/><polygon points="480,460 710,445 690,555 420,550"/>
+  </g>
+  <g font-size="22" text-anchor="middle" fill="#526779"><text x="275" y="242">W</text><text x="780" y="181">N</text><text x="835" y="380">E</text><text x="565" y="515">S</text></g>
+  <g fill="none" stroke-width="5">
+    <path d="M295 280C385 265 425 265 495 280" stroke="#287fad" marker-end="url(#blue)"/>
+    <path d="M650 235C745 210 785 180 835 130" stroke="#287fad" marker-end="url(#blue)"/>
+    <path d="M430 405C375 390 330 375 285 345" stroke="#d17a28" marker-end="url(#orange)"/>
+    <path d="M680 365C750 380 785 390 825 410" stroke="#d17a28" marker-end="url(#orange)"/>
+  </g>
+  <text x="380" y="245" text-anchor="middle" font-size="21" fill="#287fad">对流通量 Ff φf</text>
+  <text x="760" y="135" text-anchor="middle" font-size="21" fill="#287fad">质量流量 Ff</text>
+  <text x="338" y="426" text-anchor="middle" font-size="21" fill="#d17a28">扩散通量 JD,f</text>
+  <text x="790" y="445" text-anchor="middle" font-size="21" fill="#d17a28">梯度驱动</text>
+  <rect x="38" y="430" width="310" height="125" rx="16" fill="#fff4df" stroke="#cf8a2c" stroke-width="2"/>
+  <text x="193" y="467" text-anchor="middle" class="head" fill="#9b5c16">体积源项</text>
+  <text x="193" y="504" text-anchor="middle" font-size="21">∫VP Sφ dV ≈ VP Sφ,P</text>
+  <text x="193" y="536" text-anchor="middle" class="small">控制体内部的产生或消耗</text>
+  <rect x="855" y="55" width="305" height="125" rx="16" fill="#f2ecfa" stroke="#8565ae" stroke-width="2"/>
+  <text x="1007" y="92" text-anchor="middle" class="head" fill="#69498b">非稳态存储</text>
+  <text x="1007" y="128" text-anchor="middle" font-size="21">d[(ρV)P φP] / dt</text>
+  <text x="1007" y="160" text-anchor="middle" class="small">单元内守恒量随时间累积</text>
+  <path d="M850 150L765 180" stroke="#8565ae" stroke-width="2.5" stroke-dasharray="7 5"/>
+  <path d="M348 455L430 400" stroke="#cf8a2c" stroke-width="2.5" stroke-dasharray="7 5"/>
+  <rect x="365" y="500" width="380" height="65" rx="14" fill="#203f58"/>
+  <text x="555" y="529" text-anchor="middle" font-size="20" style="fill:#ffffff">存储变化 = 净输入 + 源项</text>
+  <text x="555" y="554" text-anchor="middle" font-size="17" style="fill:#dcebf4">内部界面通量在相邻单元之间成对抵消</text>
+</svg>

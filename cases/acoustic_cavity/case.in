@@ -1,0 +1,26 @@
+physics = acoustic
+mesh = mesh/medium_mixed.msh
+output = results/cavity.plt
+
+density = 1.0
+sound_speed = 1.0
+mean_velocity = 0 0
+time_scheme = central_difference
+dt = 0.005
+end_time = 1.4142135623730951
+output_interval = 100000
+log_interval = 100
+
+initial_condition = cavity_mode
+initial_amplitude = 1.0
+mode_indices = 2 1
+probe_position = 0.25 0.25
+
+[boundary.left]
+pressure = rigid
+[boundary.right]
+pressure = rigid
+[boundary.bottom]
+pressure = rigid
+[boundary.top]
+pressure = rigid

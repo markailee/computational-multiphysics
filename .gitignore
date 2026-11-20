@@ -1,3 +1,4 @@
 /build
 /multiphysics
 /texbook-ppt
+__pycache__/

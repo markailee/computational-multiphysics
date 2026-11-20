@@ -14,6 +14,12 @@
 
 namespace mp {
 
+struct FlowForceDiagnostics {
+    Vector2 total;
+    Vector2 pressure;
+    Vector2 viscous;
+};
+
 struct FlowDiagnostics {
     int iterations = 0;
     double velocityChange = 0.0;
@@ -49,6 +55,9 @@ private:
     std::vector<double> cellImbalance() const;
     double netBoundaryFlux() const;
     void updateTimeHistory();
+    FlowForceDiagnostics forceDiagnostics() const;
+    std::filesystem::path forceFile() const;
+    void writeForceHistory(const std::filesystem::path& file, double time, bool append) const;
     std::filesystem::path outputFile() const;
     void writeSummary(const std::filesystem::path& file, double time,
                       const FlowDiagnostics& diagnostics, bool append) const;
@@ -68,6 +77,9 @@ private:
     double linearAbsoluteTolerance_;
     int maximumLinearIterations_;
     Vector2 bodyForce_;
+    int forcePatch_ = -1;
+    double forceReferenceVelocity_ = 1.0;
+    double forceReferenceLength_ = 1.0;
     TimeDerivative timeDerivative_;
     FlowBoundaryConditions boundaryConditions_;
     std::unique_ptr<GradientScheme> gradient_;
