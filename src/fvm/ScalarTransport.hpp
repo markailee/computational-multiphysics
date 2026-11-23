@@ -30,6 +30,10 @@ struct ScalarTransportEquation {
     int maximumLinearIterations = 1000;
     std::string linearSolver = "bcgs";
     std::string preconditioner = "ilu";
+    const std::vector<double>* additionalFaceFlux = nullptr;
+    const std::vector<double>* densityField = nullptr;
+    const std::vector<double>* oldDensityField = nullptr;
+    const std::vector<double>* oldOldDensityField = nullptr;
 };
 
 LinearSolveInfo solveScalarTransport(const Mesh& mesh, const GradientScheme& gradient,

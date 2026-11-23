@@ -1,0 +1,56 @@
+mesh = ../mesh/stefan_coarse.msh
+output = results/stefan_coarse.plt
+material_model = ideal_gas
+species_model = transport
+flow_coupling = passive
+species = Vapor Carrier
+diffusion_model = mixture_averaged
+temperature = 300
+thermo_pressure = 89083.52805164186
+density = 1.0
+viscosity = 1.8e-5
+initial_velocity = 0.00030081547935525483 0
+initial_mass_fractions = 0.5 0.5
+time_scheme = steady
+gradient = least_squares
+convection_blending = 1.0
+species_convection_blending = 1.0
+species_relaxation = 1.0
+velocity_relaxation = 0.7
+pressure_relaxation = 0.3
+maximum_iterations = 2000
+tolerance = 1.0e-10
+continuity_tolerance = 1.0e-12
+species_tolerance = 1.0e-12
+species_composition_tolerance = 1.0e-10
+linear_tolerance = 1.0e-12
+linear_absolute_tolerance = 1.0e-14
+log_interval = 50
+
+[species.Vapor]
+molar_mass = 0.028
+viscosity = 1.8e-5
+thermal_conductivity = 0.025
+specific_heat = 1000
+diffusivity = 2.0e-5
+[species.Carrier]
+molar_mass = 0.028
+viscosity = 1.8e-5
+thermal_conductivity = 0.025
+specific_heat = 1000
+diffusivity = 2.0e-5
+[binary_diffusion.Vapor]
+Carrier = 2.0e-5
+
+[boundary.surface]
+velocity = fixedValue 0.00030081547935525483 0
+pressure = zeroGradient
+mass_fractions = fixedValue 0.8 0.2
+[boundary.outlet]
+velocity = zeroGradient
+pressure = fixedValue 0
+mass_fractions = fixedValue 0.1 0.9
+[boundary.sides]
+velocity = slip
+pressure = zeroGradient
+mass_fractions = zeroGradient

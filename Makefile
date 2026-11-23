@@ -4,19 +4,21 @@ include $(PETSC_DIR)/lib/petsc/conf/variables
 CXX := mpic++
 TARGET := multiphysics
 BUILD_DIR := build
-SOURCES := $(wildcard src/main.cpp src/mesh/*.cpp src/fvm/*.cpp src/flow/*.cpp src/acoustic/*.cpp)
+SOURCES := $(wildcard src/main.cpp src/mesh/*.cpp src/fvm/*.cpp src/flow/*.cpp src/flow/multiphase/*.cpp src/material/*.cpp src/acoustic/*.cpp)
 OBJECTS := $(patsubst src/%.cpp,$(BUILD_DIR)/%.o,$(SOURCES))
 DEPENDENCIES := $(OBJECTS:.o=.d)
 PROJECT_FLAGS := -std=c++17 -O3 -Wall -Wextra -Wpedantic -Isrc -I$(PETSC_DIR)/include
 
 PYTHON ?= python3
 
-.PHONY: all clean meshes validate validate-turbulence validate-acoustic cylinder-aeolian
+.PHONY: all clean meshes validate validate-turbulence validate-acoustic validate-multispecies validate-thermal cylinder-aeolian
 all: $(TARGET)
 
 meshes:
 	$(PYTHON) cases/generate_meshes.py
 	$(PYTHON) cases/generate_acoustic_meshes.py
+	$(PYTHON) cases/generate_multispecies_meshes.py
+	$(PYTHON) cases/generate_thermal_meshes.py
 
 validate: $(TARGET)
 	./$(TARGET) cases/cavity
@@ -25,12 +27,20 @@ validate: $(TARGET)
 	$(PYTHON) cases/validate.py
 	$(PYTHON) cases/validate_turbulence.py --run
 	$(PYTHON) cases/validate_acoustic.py --run
+	$(PYTHON) cases/validate_multispecies.py --run
+	$(PYTHON) cases/validate_thermal_compressible.py --run
 
 validate-turbulence: $(TARGET)
 	$(PYTHON) cases/validate_turbulence.py --run
 
 validate-acoustic: $(TARGET)
 	$(PYTHON) cases/validate_acoustic.py --run
+
+validate-multispecies: $(TARGET)
+	$(PYTHON) cases/validate_multispecies.py --run
+
+validate-thermal: $(TARGET)
+	$(PYTHON) cases/validate_thermal_compressible.py --run
 
 cylinder-aeolian: $(TARGET)
 	$(PYTHON) cases/run_cylinder_aeolian.py --run

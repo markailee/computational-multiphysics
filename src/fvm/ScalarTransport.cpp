@@ -10,16 +10,27 @@ namespace mp {
 LinearSolveInfo solveScalarTransport(const Mesh& mesh, const GradientScheme& gradientScheme,
                                      PetscLinearSystem& system, ScalarTransportEquation& equation) {
     const int cellCount = static_cast<int>(mesh.cells.size());
+    if (equation.additionalFaceFlux && equation.additionalFaceFlux->size() != mesh.faces.size()) {
+        throw std::runtime_error("Additional scalar face-flux size does not match the mesh");
+    }
+    if ((equation.densityField && equation.densityField->size() != mesh.cells.size()) ||
+        (equation.oldDensityField && equation.oldDensityField->size() != mesh.cells.size()) ||
+        (equation.oldOldDensityField && equation.oldOldDensityField->size() != mesh.cells.size())) {
+        throw std::runtime_error("Scalar-transport density-field size does not match the mesh");
+    }
     const auto gradient = gradientScheme.scalar(equation.field);
     SparseMatrix matrix(cellCount);
     std::vector<double> rhs(cellCount);
     for (int cell = 0; cell < cellCount; ++cell) {
         const double volume = mesh.cells[cell].volume;
-        matrix.add(cell, cell, equation.density * volume * equation.time.current +
+        const double currentDensity = equation.densityField ? (*equation.densityField)[cell] : equation.density;
+        const double oldDensity = equation.oldDensityField ? (*equation.oldDensityField)[cell] : currentDensity;
+        const double oldOldDensity = equation.oldOldDensityField ? (*equation.oldOldDensityField)[cell] : oldDensity;
+        matrix.add(cell, cell, currentDensity * volume * equation.time.current +
                                volume * equation.destruction[cell]);
         rhs[cell] = volume * equation.source[cell] +
-                    equation.density * volume * equation.time.previous * equation.old[cell] +
-                    equation.density * volume * equation.time.previousPrevious * equation.oldOld[cell];
+                    oldDensity * volume * equation.time.previous * equation.old[cell] +
+                    oldOldDensity * volume * equation.time.previousPrevious * equation.oldOld[cell];
     }
 
     for (std::size_t faceIndex = 0; faceIndex < mesh.internalFaceCount(); ++faceIndex) {
@@ -52,6 +63,10 @@ LinearSolveInfo solveScalarTransport(const Mesh& mesh, const GradientScheme& gra
         const double deferred = equation.convectionBlending * flux * (central - upwind);
         rhs[owner] -= deferred;
         rhs[neighbour] += deferred;
+        if (equation.additionalFaceFlux) {
+            rhs[owner] -= (*equation.additionalFaceFlux)[faceIndex];
+            rhs[neighbour] += (*equation.additionalFaceFlux)[faceIndex];
+        }
     }
 
     for (std::size_t faceIndex = mesh.internalFaceCount(); faceIndex < mesh.faces.size(); ++faceIndex) {
@@ -70,6 +85,7 @@ LinearSolveInfo solveScalarTransport(const Mesh& mesh, const GradientScheme& gra
         if (flux >= 0.0) matrix.add(owner, owner, flux);
         else rhs[owner] -= flux * central;
         rhs[owner] -= equation.convectionBlending * flux * (central - upwind);
+        if (equation.additionalFaceFlux) rhs[owner] -= (*equation.additionalFaceFlux)[faceIndex];
     }
 
     for (int cell = 0; cell < cellCount; ++cell) {

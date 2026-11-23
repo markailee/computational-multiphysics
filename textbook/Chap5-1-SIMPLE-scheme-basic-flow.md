@@ -964,7 +964,8 @@ $$
 \frac{\partial\rho E}{\partial t}
 +\nabla\cdot[\mathbf U(\rho E+p)]
 =\nabla\cdot(k_f\nabla T)
-+\nabla\cdot(\boldsymbol\tau\cdot\mathbf U)+S_q,
++\nabla\cdot(\boldsymbol\tau\cdot\mathbf U)
++\rho\mathbf g\cdot\mathbf U+S_q,
 \tag{5.83}
 $$
 
@@ -1072,7 +1073,7 @@ $$
 \rho c_p\frac{\mathrm DT}{\mathrm Dt}
 =\frac{\mathrm Dp}{\mathrm Dt}
 +\nabla\cdot(k_f\nabla T)
-+\Phi+S_q,
++\Phi+\rho\mathbf f\cdot\mathbf U+S_q,
 \tag{5.93}
 $$
 
@@ -1091,6 +1092,127 @@ $$
 9. 收敛后更新旧时间层并推进 $t\leftarrow t+\Delta t$。
 
 压力、温度、密度和界面流量必须采用相容的更新次序。只更新压力而忘记密度，或使用未修正的界面质量流量，都可能破坏能量与质量守恒。
+
+### 5.7.7 本程序的 Boussinesq 与理想气体实现
+
+本项目的二维同位网格求解器实现了式（5.78）—（5.80）的 Boussinesq 模型，以及单组分理想气体的真实密度可压缩模型。通过 `flow_model = incompressible`、`boussinesq` 或 `compressible` 选择；缺省仍为原来的不可压缩常密度算法。可压缩模型使用 `material_model = ideal_gas`，并给定 `gas_constant`、`specific_heat`、`thermal_conductivity` 和 `viscosity`。这里的“真实密度”指直接由状态方程计算 $\rho(p,T)$，并不表示已经实现真实气体状态方程。
+
+#### 浮力与温度方程的离散
+
+Boussinesq 动量方程使用静水修正压力 $p_{rgh}$。单元 $P$ 的浮力右端项按控制体积分：
+
+$$
+\mathbf b_{P,b}=-\rho_0\beta(T_P-T_0)\mathbf gV_P.
+\tag{5.94}
+$$
+
+重力以外的 `body_force` 同样乘以 $\rho_0V_P$。这里的 $V_P$ 不可省略，否则源项会随网格加密而被人为放大。密度在对流、扩散和时间项中仍取 $\rho_0$，不在状态方程中更新。
+
+两种热模型都复用第4章的守恒标量输运算子。以温度为未知量、$c_p$ 为常数时，实际组装的形式为
+
+$$
+\frac{\partial\rho T}{\partial t}
++\nabla\cdot(\rho\mathbf UT)
+=\nabla\cdot\left[\left(\frac{k_f}{c_p}
++\frac{\mu_t}{Pr_t}\right)\nabla T\right]
++\frac{S_T}{c_p},
+\tag{5.95}
+$$
+
+其中 Boussinesq 模型取 $S_T=S_q$；可压缩模型取
+
+$$
+S_T=\frac{\partial p}{\partial t}
++\mathbf U\cdot\nabla p+\Phi
++\rho\mathbf f\cdot\mathbf U+S_q.
+\tag{5.96}
+$$
+
+式（5.95）是静焓方程除以常数 $c_p$ 后的守恒形式，与式（5.93）及连续方程一致。黏性耗散按
+
+$$
+\Phi=2\mu\left[S_{xx}^2+S_{yy}^2+2S_{xy}^2\right]
+-\frac23\mu(\nabla\cdot\mathbf U)^2,
+\qquad S_{xy}=\frac12\left(\frac{\partial u}{\partial y}
++\frac{\partial v}{\partial x}\right)
+\tag{5.97}
+$$
+
+计算，可用 `viscous_dissipation` 控制；可压缩模型缺省启用，Boussinesq 模型缺省忽略。可压缩动量方程也同时包含分子转置应力和 $-\tfrac23\mu(\nabla\cdot\mathbf U)\mathbf I$，从而与式（5.97）保持一致。
+
+温度边界在每个 `[boundary.NAME]` 中用 `temperature` 指定：`fixedValue T`、`zeroGradient`（或 `adiabatic`），以及 `fixedHeatFlux q`。最后一种的 $q$ 单位为 W/m²，以进入流体为正，对邻近单元增加 $qA_f/c_p$ 的式（5.95）右端积分项。均匀 `heat_source` 的单位为 W/m³。
+
+#### 可压缩压力修正的具体组装
+
+压力基可压缩求解使用**绝对静压**，不是表压。`initial_pressure` 和所有 `pressure = fixedValue ...` 均必须为正的绝对压力；稳态问题至少需要一个定压边界。理想气体线性化系数为
+
+$$
+\rho=\frac{p}{RT},\qquad
+\Psi=\left(\frac{\partial\rho}{\partial p}\right)_T=\frac{\rho}{p}.
+$$
+
+设时间离散写成 $D_t\rho=a_0\rho^*-a_1\rho^n-a_2\rho^{n-1}$，则程序实际求解
+
+$$
+\begin{aligned}
+&\Psi_PV_Pa_0p_P'
++\sum_{f\in\mathcal F_P}\left[Q_f^*\Psi_{f,up}p_{f,up}'
++C_f(p_O'-p_N')\right]\\
+&\quad=-V_P(a_0\rho_P^*-a_1\rho_P^n-a_2\rho_P^{n-1})
+-\sum_{f\in\mathcal F_P}\dot m_f^* ,
+\end{aligned}
+\tag{5.98}
+$$
+
+其中 $C_f=\rho_fD_fA_f/\delta_f$ 来自与 Rhie–Chow 插值相同的动量对角系数，$Q_f^*=\dot m_f^*/\rho_f^*$，密度压力对流项采用迎风单元。稳态时 $a_0=a_1=a_2=0$，但压力对流项仍保留，不能把可压缩稳态压力方程退化为不可压缩 Poisson 方程。内部面质量流量按下式修正：
+
+$$
+\dot m_f\leftarrow\dot m_f^*
++C_f(p_O'-p_N')
++Q_f^*\Psi_{f,up}p_{f,up}'.
+\tag{5.99}
+$$
+
+未给定压力的边界（包括给定速度进口）在本次 $p'$ 求解中保持其边界质量流量不变，压力和温度更新后再由状态方程重算边界密度；这相当于把该边界的 $Q_f^*\rho_f'$ 延迟到下一次外迭代。这样可避免进口负对角项造成的启动不稳定，同时保留全部内部面密度修正。固定压力边界取 $p_b'=0$。由于式（5.98）一般非对称，可压缩压力方程缺省使用 BiCGStab 和 ILU，而不是不可压缩方程常用的 CG 和 ICC。
+
+每次压力修正后，以 $p\leftarrow p+\alpha_pp'$ 更新绝对压力，并立即由 $\rho=p/(RT)$ 更新密度。能量求解后再次更新密度和物性。Euler/BDF2 时间项分别存储当前、旧和次旧密度、温度、压力与速度；因此时间存储项使用对应时间层的密度，而不是把当前密度乘到所有旧值上。外迭代除速度、压力和质量残差外，还检查温度与密度更新量。
+
+典型设置为：
+
+```ini
+flow_model = boussinesq
+material_model = constant
+density = 1.0
+viscosity = 0.71
+thermal_conductivity = 1.0
+specific_heat = 1.0
+thermal_expansion = 0.001
+reference_temperature = 300.5
+initial_temperature = 300.5
+gravity = 0 -7100000
+
+[boundary.hot]
+velocity = noSlip
+pressure = zeroGradient
+temperature = fixedValue 301.0
+```
+
+```ini
+flow_model = compressible
+material_model = ideal_gas
+gas_constant = 287.0
+specific_heat = 1005.0
+thermal_conductivity = 0.025
+viscosity = 1.8e-5
+initial_pressure = 101325
+initial_temperature = 300
+pressure_ksp = bcgs
+pressure_pc = ilu
+```
+
+当前可压缩实现限于二维、单组分、常 $c_p$ 理想气体和层流；不包含温度相关输运物性、真实气体状态方程、化学反应、可压缩湍流修正或专用激波捕捉格式。高马赫数、强激波问题需要进一步采用带限制器的守恒通量和相应稳定化方法。Boussinesq 模型则可与原有层流/RANS 框架组合，其湍流热扩散采用 $\mu_t/Pr_t$。
+
+验证算例位于 `cases/boussinesq_cavity/`、`cases/compressible_conduction/`、`cases/compressible_closed_heating/` 和 `cases/compressible_nozzle/`。`make validate-thermal` 会执行自然对流基准、理想气体导热、闭口均匀加热和亚声速喷管检查；实测结果见 `validation/thermal_compressible_validation.md`。
 
 ## 本章小结
 
@@ -1134,3 +1256,6 @@ SIMPLE 通过“动量预测—压力修正—速度修正”的分离迭代实�
 7. Pope, S. B. *Turbulent Flows*. Cambridge University Press, 2000.
 8. Smagorinsky, J. General circulation experiments with the primitive equations. *Monthly Weather Review*, 1963, 91: 99–164.
 9. Germano, M., Piomelli, U., Moin, P., and Cabot, W. H. A dynamic subgrid-scale eddy viscosity model. *Physics of Fluids A*, 1991, 3: 1760–1765.
+10. de Vahl Davis, G. Natural convection of air in a square cavity: a bench mark numerical solution. *International Journal for Numerical Methods in Fluids*, 1983, 3: 249–264. [DOI: 10.1002/fld.1650030305](https://onlinelibrary.wiley.com/doi/10.1002/fld.1650030305)；基准值转载表可见 [Khanafer 等的开放文献](https://pmc.ncbi.nlm.nih.gov/articles/PMC3605369/)。
+11. Evrard, F., and van Wachem, B. G. M. Conservative finite-volume framework and pressure-based algorithm for flows of incompressible, ideal-gas and real-gas fluids at all speeds. *Journal of Computational Physics*, 2020. [开放手稿](https://arxiv.org/abs/2002.10482)。
+12. Krumov, K., Penkova, N., and Zlateva, P. CFD analysis of compressible flows through nozzles and diffusers. *U.P.B. Scientific Bulletin, Series D*, 2021, 83(2): 149–158. [全文](https://www.scientificbulletin.upb.ro/static/pdfs/full53d_123872.pdf)。

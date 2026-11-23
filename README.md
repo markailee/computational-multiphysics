@@ -1,10 +1,10 @@
 # 2D Multiphysics Finite-Volume Solver
 
-A C++17 finite-volume project for two-dimensional multiphysics calculations on unstructured meshes. The executable implements an **incompressible Navier–Stokes solver** using cell-centered SIMPLE pressure–velocity coupling and a **linear acoustic solver** using the node-centered dual-control-volume formulation of `textbook/Chap5-4-acoustic.md`. The mesh, discretization, linear-algebra, and output components are shared foundations for further physics modules.
+A C++17 finite-volume project for two-dimensional multiphysics calculations on unstructured meshes. The executable implements **incompressible, Boussinesq thermal-dilation, and ideal-gas compressible Navier–Stokes solvers** using cell-centered SIMPLE pressure–velocity coupling and a **linear acoustic solver** using the node-centered dual-control-volume formulation of `textbook/Chap5-4-acoustic.md`. The mesh, discretization, linear-algebra, and output components are shared foundations for further physics modules.
 
 The project is intended for both numerical-method development and teaching. It emphasizes conservative face fluxes, explicit mesh connectivity, readable operator implementations, and reproducible benchmark cases.
 
-> **Current scope:** serial two-dimensional incompressible flow and linear acoustics are implemented as separate physics modules, with one-way Curle-type flow-to-acoustic source coupling for the cylinder aeolian-tone case. Flow uses cell-centered fields; acoustics uses nodal fields on median-dual control areas. Elasticity, two-way fluid–structure/acoustic coupling, non-uniform acoustic media, and MPI-distributed calculations remain future work.
+> **Current scope:** serial two-dimensional incompressible/Boussinesq flow, single-component laminar ideal-gas compressible flow, passive inert multispecies transport, and linear acoustics are implemented as separate physics modules, with one-way Curle-type flow-to-acoustic source coupling for the cylinder aeolian-tone case. Flow and species use cell-centered fields; acoustics uses nodal fields on median-dual control areas. Composition-driven variable-density flow, reactions, real-gas models, compressible turbulence, shock capturing, elasticity, two-way fluid–structure/acoustic coupling, non-uniform acoustic media, MPI-distributed calculations, and the VOF/DPM/Euler–Euler solve routines remain future work.
 
 ## Contents
 
@@ -15,6 +15,7 @@ The project is intended for both numerical-method development and teaching. It e
 - [Build and run in WSL](#build-and-run-in-wsl)
 - [Case configuration](#case-configuration)
 - [Boundary conditions](#boundary-conditions)
+- [Material and multispecies configuration](#material-and-multispecies-configuration)
 - [Acoustic configuration](#acoustic-configuration)
 - [Gmsh meshes](#gmsh-meshes)
 - [Output files](#output-files)
@@ -51,7 +52,7 @@ The reusable code under `src/fvm/` includes:
 - Tecplot ASCII output for unstructured triangles and quadrilaterals.
 - A `PhysicsSolver` interface for future physics modules.
 
-### Incompressible Navier–Stokes solver
+### Pressure-based Navier–Stokes solvers
 
 The code under `src/flow/` implements:
 
@@ -65,10 +66,21 @@ The code under `src/flow/` implements:
 - Fixed-value and zero-gradient pressure boundaries.
 - Automatic pressure-reference fixing when all pressure boundaries are Neumann conditions.
 - Optional steady or transient calculations and a spatially uniform body force.
+- Boussinesq thermal dilation with reference-density transport, hydrostatically modified pressure, integrated buoyancy, and coupled temperature transport.
+- Single-component ideal-gas compressible flow with absolute pressure, cell-variable density, density storage and pressure convection in pressure correction, and static-enthalpy energy with pressure work and viscous dissipation.
+- Fixed-temperature, adiabatic/zero-gradient, and inward-positive fixed-heat-flux thermal boundaries, plus uniform volumetric heating.
 - Standard high-Reynolds-number \(k\)-\(\varepsilon\) turbulence with logarithmic-law wall functions.
 - Menter SST-2003 \(k\)-\(\omega\) turbulence with strain-based eddy-viscosity limiting and low-\(y^+\) wall integration.
 - Conservative transport of turbulence variables with bounded implicit upwind convection and optional deferred correction.
 - Turbulence fields, wall shear, friction velocity, and \(y^+\) diagnostics in Tecplot and CSV output.
+
+### Material models and multispecies transport
+
+The independent `src/material/` layer provides constant-property fluids, a single-component ideal gas for compressible flow, ideal-gas mixtures, and volume-fraction mixture property rules. Ideal-gas mixtures support mass/mole conversion, Wilke viscosity, arithmetic/harmonic thermal conductivity, mass-weighted heat capacity, and constant or mixture-averaged diffusivities. All inputs use SI units.
+
+The optional `species_model = transport` module adds two or more inert species to the existing cell-centered SIMPLE solver. It reuses steady, backward-Euler, and BDF2 discretizations, supports fixed-value and zero-gradient composition boundaries, includes turbulent diffusivity through a configurable Schmidt number, and solves the first `N-1` species with a conservative correction that enforces zero summed diffusion flux, while the last species is computed from the unit-sum constraint and its flux is closed by the residual. Species convergence, boundedness, composition closure, and mixture properties are included in output. The current flow coupling is explicitly **passive and constant-property**; composition-dependent low-Mach pressure coupling is not yet implemented.
+
+`src/flow/multiphase/` defines independent VOF, algebraic-slip, Euler–Euler, and DPM interfaces and their coupling context. Their solve routines are intentionally unavailable at this stage and throw a clear exception if selected.
 
 ### Linear acoustic solver
 
@@ -88,7 +100,7 @@ The code under `src/acoustic/` implements the formulation of `textbook/Chap5-4-a
 
 ### Governing equations
 
-The solver uses constant density \(\rho\) and constant dynamic viscosity \(\mu\). The incompressible momentum and continuity equations are
+With the default `flow_model = incompressible`, the solver uses constant density \(\rho\) and constant dynamic viscosity \(\mu\). The incompressible momentum and continuity equations are
 
 $$
 \frac{\partial(\rho\mathbf{U})}{\partial t}
@@ -103,6 +115,8 @@ $$
 The `viscosity` setting is the **dynamic viscosity** \(\mu\), not the kinematic viscosity \(\nu=\mu/\rho\). The supplied cases use \(\rho=1\), so their numerical dynamic and kinematic viscosities have the same value.
 
 Integrating the momentum equation over control volume \(P\) gives a balance of time accumulation, convection, diffusion, pressure, and body-force terms. Each internal face has a single owner-oriented normal and mass flux, which preserves discrete conservation.
+
+With `flow_model = boussinesq`, density remains at its reference value except for the buoyancy source \(-\rho_0\beta(T-T_0)\mathbf gV_P\), and `p` is hydrostatically modified pressure. With `flow_model = compressible`, `material_model = ideal_gas` evaluates \(\rho=p/(RT)\) from absolute pressure and temperature, and the pressure equation additionally contains density storage and upwind pressure convection. Both thermal models solve temperature from the conservative static-enthalpy equation. The full equations and implementation notes are in `textbook/Chap5-1-SIMPLE-scheme-basic-flow.md`, section 5.7.7.
 
 ### Gradient reconstruction
 
@@ -151,9 +165,9 @@ Each outer iteration performs the following operations:
 1. Reconstruct velocity and pressure gradients.
 2. Assemble and solve the two momentum components using the current pressure and face mass flux.
 3. Recompute face mass fluxes from the predicted velocity using Rhie–Chow interpolation.
-4. Assemble and solve the pressure-correction equation so that the corrected face fluxes satisfy discrete continuity.
-5. Correct cell velocities, pressure, and face mass fluxes.
-6. Check velocity updates, pressure updates, and cell mass imbalances.
+4. Assemble and solve the pressure-correction equation so that the corrected face fluxes satisfy discrete continuity; compressible flow also includes density storage and pressure convection.
+5. Correct cell velocities, pressure, and face mass fluxes, then update density from the equation of state in compressible mode.
+6. Solve energy when enabled, update temperature-dependent density and properties, and check velocity, pressure, temperature, density, and cell mass imbalances.
 
 The Rhie–Chow normal velocity contains the difference between the face-normal pressure derivative and the interpolated cell pressure gradient. Its momentum weighting uses the relaxed momentum diagonal.
 
@@ -170,7 +184,7 @@ Default linear-solver choices are:
 | Momentum | `bcgs` | `ilu` |
 | Pressure correction | `cg` | `icc` |
 
-They can be changed in `case.in`. Standard PETSc command-line options are also passed through the solver initialization. Turbulence equations default to `bcgs` with `ilu`.
+Compressible pressure correction defaults to `bcgs` with `ilu` because density convection makes its matrix nonsymmetric. Energy also defaults to `bcgs`/`ilu`. These choices can be changed in `case.in`. Standard PETSc command-line options are passed through solver initialization. Turbulence equations default to `bcgs` with `ilu`.
 
 ### RANS equations and eddy viscosity
 
@@ -296,10 +310,17 @@ Turbulence lower bounds default to `minimum_k = 1e-12`, `minimum_epsilon = 1e-12
 │   │   ├── TecplotWriter.*     Unstructured Tecplot ASCII output
 │   │   ├── Config.hpp/.cpp     Case-file parser
 │   │   └── PhysicsSolver.hpp   Common interface for physics modules
+│   ├── material/
+│   │   ├── MaterialModel.*     Material interface, constant fluid, and factory
+│   │   ├── IdealGasMixture.*   Ideal gas, Wilke viscosity, and mixture diffusivities
+│   │   └── VolumeFractionMixture.* Phase-fraction property mixing
 │   ├── flow/
 │   │   ├── BoundaryConditions.* Flow boundary-condition handling
+│   │   ├── EnergyModel.*       Temperature boundaries, energy transport, and pressure work
 │   │   ├── TurbulenceModel.*   Standard k-epsilon and SST-2003 implementations
-│   │   └── SimpleSolver.*      SIMPLE, Rhie–Chow, and RANS assembly
+│   │   ├── MultiSpeciesModel.* Species fields, transport, flux closure, and diagnostics
+│   │   ├── multiphase/        VOF, ASM, Euler–Euler, DPM interfaces (not implemented)
+│   │   └── SimpleSolver.*      SIMPLE, Rhie–Chow, RANS, and optional module scheduling
 │   └── acoustic/
 │       ├── AcousticBoundaryConditions.* Acoustic patch parsing
 │       ├── AcousticSolver.*    Nodal dual-volume operators and time integration
@@ -310,6 +331,18 @@ Turbulence lower bounds default to `minimum_k = 1e-12`, `minimum_epsilon = 1e-12
 │   ├── validate_turbulence.py  Turbulence runs, reference errors, and plots
 │   ├── generate_acoustic_meshes.py Mixed acoustic mesh generation
 │   ├── validate_acoustic.py    Analytical acoustic runs, metrics, and SVG plots
+│   ├── generate_multispecies_meshes.py Structured species-verification meshes
+│   ├── validate_multispecies.py Species analytical/property checks and grid refinement
+│   ├── generate_thermal_meshes.py Structured thermal-cavity and nozzle meshes
+│   ├── validate_thermal_compressible.py Boussinesq/compressible analytical validation
+│   ├── boussinesq_cavity/      de Vahl Davis natural-convection grids
+│   ├── compressible_conduction/ Zero-flow ideal-gas conduction
+│   ├── compressible_closed_heating/ Transient constant-mass heating
+│   ├── compressible_nozzle/    Subsonic isentropic nozzle grids
+│   ├── species_stefan_tube/    Binary analytical Stefan diffusion at three resolutions
+│   ├── species_flux_correction/ Unequal-diffusivity analytical flux-closure checks
+│   ├── species_diffusion/      Three-species transient analytical diffusion
+│   ├── species_air_properties/ Ideal-gas and Wilke property verification
 │   ├── acoustic_*/             Cavity, plane-wave, convection, and absorption cases
 │   ├── cylinder_aeolian/       Transient cylinder flow to Curle-dipole acoustic propagation
 │   ├── run_cylinder_aeolian.py Hybrid flow/source/acoustic workflow and plots
@@ -400,6 +433,14 @@ Pass either a case directory or the full path to a `case.in` file:
 ./multiphysics cases/plate_sst_k_omega
 ./multiphysics cases/elbow_k_epsilon
 ./multiphysics cases/elbow_sst_k_omega
+./multiphysics cases/species_stefan_tube/medium
+./multiphysics cases/species_flux_correction/medium
+./multiphysics cases/species_diffusion/medium
+./multiphysics cases/species_air_properties
+./multiphysics cases/boussinesq_cavity/fine
+./multiphysics cases/compressible_conduction
+./multiphysics cases/compressible_closed_heating
+./multiphysics cases/compressible_nozzle/fine
 ./multiphysics cases/acoustic_cavity
 ./multiphysics cases/acoustic_plane_wave
 ./multiphysics cases/acoustic_convected
@@ -419,6 +460,8 @@ Run the solver directly, without `mpirun`; the current implementation intentiona
 | `make validate` | Run all laminar regressions and the complete plate/elbow turbulence matrix. |
 | `make validate-turbulence` | Run both models at all plate/elbow resolutions, check conservation and accuracy, and generate comparison data and SVG plots. |
 | `make validate-acoustic` | Run all analytical acoustic cases, check errors/reflection, and generate comparison data and SVG plots. |
+| `make validate-multispecies` | Run ten species/property cases, check analytical errors, grid order, conservation, and generate metrics and SVG plots. |
+| `make validate-thermal` | Run three natural-convection grids, ideal-gas conduction, transient closed heating, and three compressible-nozzle grids. |
 | `make cylinder-aeolian` | Run transient `Re = 150` cylinder flow, construct a Curle dipole from its force history, propagate the sound, and plot the results. |
 | `make clean` | Remove the executable and `build/`. It does not remove case results or `validation/`. |
 
@@ -436,14 +479,16 @@ pressure = zeroGradient
 
 | Setting | Default | Meaning |
 |---|---:|---|
-| `physics` | `flow` | `flow` for incompressible SIMPLE or `acoustic` for the nodal acoustic solver. |
+| `physics` | `flow` | `flow` for cell-centered SIMPLE or `acoustic` for the nodal acoustic solver. |
+| `flow_model` | `incompressible` | `incompressible`, `boussinesq`, or `compressible` (single-component ideal gas). |
 | `mesh` | required | Gmsh file, relative to the case directory unless absolute. |
 | `output` | `results/flow.plt` | Tecplot output path. |
 | `time_scheme` | `steady` | Flow: `steady`, `euler`, `backward_euler`, or `bdf2`. See the acoustic section for its schemes. |
 | `density` | `1.0` | Constant density \(\rho\). Must be positive. |
 | `viscosity` | `0.01` | Constant dynamic viscosity \(\mu\). |
 | `initial_velocity` | `0 0` | Initial cell velocity, two components. |
-| `initial_pressure` | `0.0` | Initial cell pressure. |
+| `initial_pressure` | `0.0` (`101325` compressible) | Initial pressure; compressible cases use positive absolute pressure. |
+| `initial_temperature` | `300` | Initial absolute temperature for thermal models. |
 | `turbulence_model` | `laminar` | `laminar`, `k_epsilon`, or `sst_k_omega`. |
 | `initial_k` | `1e-6` | Initial turbulent kinetic energy; must exceed its floor. |
 | `initial_epsilon` | `1e-6` | Initial dissipation for `k_epsilon`. |
@@ -472,6 +517,36 @@ pressure = zeroGradient
 | `log_interval` | `10` | SIMPLE console-output interval. |
 
 The outer `tolerance` and `continuity_tolerance` are absolute quantities. They should be reconsidered if the mesh, density, velocity scale, or units change substantially.
+
+### Thermal and compressible settings
+
+| Setting | Default | Meaning |
+|---|---:|---|
+| `material_model` | `constant` | Use `constant` for Boussinesq or `ideal_gas` for compressible flow. |
+| `thermal_expansion` | `0` | Boussinesq \(\beta\) in 1/K; required to be positive. |
+| `reference_temperature` | `initial_temperature` | \(T_0\) in the Boussinesq buoyancy source. |
+| `gravity` | `0 0` | Gravity vector. Boussinesq pressure is hydrostatically modified; compressible flow applies \(\rho\mathbf g\) directly. |
+| `thermal_conductivity` | `0` | Molecular conductivity \(k\) in W/(m K). |
+| `specific_heat` | `0` | Constant \(c_p\) in J/(kg K); must be positive for energy transport. |
+| `gas_constant` | `287` | Specific gas constant \(R\) for the single-component ideal gas. |
+| `heat_source` | `0` | Uniform volumetric heat source in W/m³. |
+| `viscous_dissipation` | `true` compressible, `false` Boussinesq | Include viscous dissipation in energy. |
+| `energy_relaxation` | `0.7` | Energy-equation under-relaxation in `(0,1]`. |
+| `energy_convection_blending` | `convection_blending` | Upwind/deferred-central energy convection blend. |
+| `turbulent_prandtl` | `0.9` | Turbulent Prandtl number for Boussinesq/RANS heat transport. |
+| `energy_tolerance` | `tolerance` | Maximum absolute temperature update in K. |
+| `density_tolerance` | `tolerance` | Maximum absolute density update in kg/m³ for compressible convergence. |
+| `energy_ksp`, `energy_pc` | `bcgs`, `ilu` | Linear solver and preconditioner for energy. |
+
+Every patch in a thermal case needs a `temperature` entry:
+
+| Syntax | Behaviour |
+|---|---|
+| `temperature = fixedValue T` | Fixed positive absolute temperature in K. |
+| `temperature = zeroGradient` | Zero normal temperature gradient; `adiabatic` is an alias. |
+| `temperature = fixedHeatFlux q` | Prescribed heat flux in W/m², positive into the fluid. |
+
+For compressible flow, `initial_pressure` and every `pressure = fixedValue ...` are absolute pressures in Pa. A steady compressible case requires at least one fixed-pressure boundary. Compressible mode currently supports laminar single-component ideal gas only; Boussinesq mode uses the existing laminar/RANS models with constant reference density.
 
 ### Transient settings
 
@@ -560,6 +635,81 @@ pressure = fixedValue 0
 ```
 
 For a closed flow such as the cavity, all pressure boundaries can be `zeroGradient`; the solver then supplies the required discrete pressure reference.
+
+## Material and multispecies configuration
+
+For single-component compressible flow, use `flow_model = compressible` and `material_model = ideal_gas` without a `species` list; `gas_constant`, `specific_heat`, `thermal_conductivity`, and `viscosity` define the fluid. For inert multispecies transport, set `material_model = ideal_gas`, provide a `species` list, and set `species_model = transport`. In the latter passive module, the legacy `density` and `viscosity` settings remain the constant carrier properties used by momentum, continuity, and species convection. `flow_coupling = passive` is the only currently implemented species coupling. `temperature` and `thermo_pressure` are the passive material temperature and absolute thermodynamic pressure; `thermo_pressure` is not the incompressible SIMPLE gauge pressure.
+
+| Setting | Default | Meaning |
+|---|---:|---|
+| `material_model` | `constant` | `constant`, `ideal_gas`, or `volume_fraction_mixture`. The last currently provides a property API only. |
+| `species_model` | `none` | `none` or `transport`. |
+| `flow_coupling` | `passive` | Passive constant-density/viscosity coupling; other values are rejected. |
+| `species` | required for mixtures | Space-separated unique names; use letters, digits, and underscores, starting with a letter or underscore. |
+| `diffusion_model` | `constant` | `constant` per-species diffusivities or `mixture_averaged` binary-pair mixing. |
+| `temperature` | `300` | Constant material temperature in K; no energy equation is solved. |
+| `thermo_pressure` | `101325` | Absolute pressure in Pa for the ideal-gas equation of state. |
+| `initial_mass_fractions` | required | One non-negative value per species, summing to one within `1e-8`. |
+| `species_relaxation` | `0.7` | Species linear-equation under-relaxation in `(0,1]`. |
+| `species_convection_blending` | `0.0` | Zero for upwind, one for deferred central correction. Significant unbounded overshoots are rejected at convergence. |
+| `turbulent_schmidt` | `0.7` | Turbulent Schmidt number; adds `mu_t/Sc_t` to each species diffusion coefficient. |
+| `species_tolerance` | `tolerance` | Maximum absolute mass-fraction update. |
+| `species_composition_tolerance` | `1e-8` | Allowed sum-closure error and bound tolerance at outer convergence. |
+| `species_ksp`, `species_pc` | `bcgs`, `ilu` | Linear solver and preconditioner shared by the species solves. |
+| `multiphase_model` | `none` | `vof`, `asm`, `euler_euler`, or `dpm` select interfaces that currently throw an explicit not-implemented exception. |
+
+Each `[species.NAME]` section requires SI-valued `molar_mass` (kg/mol), `viscosity` (Pa s), `thermal_conductivity` (W/(m K)), `specific_heat` (J/(kg K)), and `diffusivity` (m²/s). For `diffusion_model = mixture_averaged`, every upper-triangular binary pair is also required. Pair settings use the first species as a section name:
+
+```ini
+material_model = ideal_gas
+species_model = transport
+flow_coupling = passive
+species = N2 O2
+diffusion_model = mixture_averaged
+temperature = 300
+thermo_pressure = 101325
+density = 1.1719579191113527
+viscosity = 1.8188965989347983e-5
+initial_mass_fractions = 0.7670824885424203 0.23291751145757966
+species_relaxation = 1.0
+species_convection_blending = 0.0
+turbulent_schmidt = 0.7
+
+[species.N2]
+molar_mass = 0.0280134
+viscosity = 1.76e-5
+thermal_conductivity = 0.0259
+specific_heat = 1040
+diffusivity = 2.0e-5
+
+[species.O2]
+molar_mass = 0.0319988
+viscosity = 2.04e-5
+thermal_conductivity = 0.0266
+specific_heat = 918
+diffusivity = 2.0e-5
+
+[binary_diffusion.N2]
+O2 = 2.0e-5
+```
+
+Every flow boundary patch additionally needs one composition condition:
+
+```ini
+[boundary.inlet]
+velocity = fixedValue 0.001 0
+pressure = zeroGradient
+mass_fractions = fixedValue 0.7670824885424203 0.23291751145757966
+
+[boundary.outlet]
+velocity = zeroGradient
+pressure = fixedValue 0
+mass_fractions = zeroGradient
+```
+
+All species on a patch share either `fixedValue` or `zeroGradient`; fixed values must sum to one. Zero-gradient outlets with substantial reverse flow need a more complete backflow treatment and are not a general outflow boundary model.
+
+`VolumeFractionMixture` independently implements volume-weighted density, viscosity and thermal conductivity, and mass-weighted heat capacity from `phases` and `[phase.NAME]` data. It is available to future multiphase implementations; selecting it in the current executable without an active multiphase model is rejected. The full mathematical formulation and module ownership are documented in `textbook/Chap5-2-SIMPLE-scheme-multiphase-multispecies.md`, sections 5.11.7–5.11.9.
 
 ## Acoustic configuration
 
@@ -707,14 +857,21 @@ The default output is ASCII Tecplot. Nodal coordinates and cell-centered fields 
 |---|---|---|
 | `X`, `Y` | Nodes | Mesh coordinates. |
 | `U_x`, `U_y` | Cell centres | Velocity components. |
-| `p` | Cell centres | Static pressure. |
-| `mass_imbalance` | Cell centres | Signed integrated cell mass imbalance in the current mass-flux units. |
+| `p` | Cell centres | Static pressure; hydrostatically modified for Boussinesq and absolute for compressible flow. |
+| `T` | Cell centres | Absolute temperature for thermal models. |
+| `rho` | Cell centres | Reference or equation-of-state density for thermal models. |
+| `lambda`, `cp` | Cell centres | Molecular conductivity and specific heat for thermal models. |
+| `mass_imbalance` | Cell centres | Signed integrated cell mass imbalance, including transient density accumulation for compressible flow. |
 | `vorticity` | Cell centres | `dv/dx - du/dy`, enabled by `output_vorticity = true`. |
 | `k` | Cell centres | Turbulent kinetic energy, for turbulent cases. |
 | `epsilon` | Cell centres | Dissipation, for `k_epsilon`. |
 | `omega` | Cell centres | Specific dissipation, for SST. |
 | `mu_t` | Cell centres | Turbulent dynamic eddy viscosity. |
 | `F1`, `F2` | Cell centres | SST blending functions. |
+| `Y_NAME` | Cell centres | Mass fraction of species `NAME`, for multispecies cases. |
+| `D_NAME` | Cell centres | Molecular mixture-averaged diffusivity of species `NAME`. |
+| `rho_mix`, `mu_mix` | Cell centres | Material density and dynamic viscosity; diagnostic in the current passive coupling. |
+| `lambda_mix`, `cp_mix` | Cell centres | Material thermal conductivity and mass-specific heat capacity. |
 
 Mixed meshes are written as separate triangle and quadrilateral zones. A steady case writes the configured file directly. A transient case appends the time-step number to the stem, for example `flow_100.plt`.
 
@@ -732,9 +889,14 @@ Each run also writes `<output-stem>_summary.csv` with:
 - `net_boundary_flux`
 - `turbulence_change`
 - `turbulence_linear_iterations`
+- `species_change`
+- `species_composition_error`
+- `minimum_mass_fraction`, `maximum_mass_fraction`
+- `species_linear_iterations`
+- `temperature_change`, `density_change`, `energy_linear_iterations`
 - `converged`
 
-The console log uses `dU` for the maximum cell-velocity update, `dp` for the maximum relaxed pressure update, `dT` for the normalized turbulence update, `continuity` for the maximum absolute cell mass imbalance, and `linear` for the total PETSc iterations used by that outer iteration's momentum, pressure, and turbulence solves. Laminar output retains zero turbulence diagnostics.
+The console log uses `dU` for the maximum cell-velocity update, `dp` for the maximum relaxed pressure update, `dTurb` for the normalized turbulence update, `continuity` for the maximum absolute cell mass imbalance, and `linear` for the total PETSc iterations used by that outer iteration's momentum, pressure, energy, turbulence, and species solves. Thermal cases additionally print `dTemp` and `drho`; multispecies cases print `dY` and `Ysum`. Single-component laminar output retains zero turbulence diagnostics.
 
 ## Validation cases
 
@@ -744,7 +906,7 @@ Run the complete workflow:
 make validate
 ```
 
-This runs the three laminar regressions and all twelve plate/elbow turbulence cases. `cases/validate.py` checks the laminar cases; `cases/validate_turbulence.py --run` executes the turbulence matrix, checks conservation and accuracy, and writes `validation/metrics.csv`, comparison CSVs, and SVG plots. The detailed model-validation report is [`validation/turbulence_validation.md`](validation/turbulence_validation.md).
+This runs the three laminar regressions, all twelve plate/elbow turbulence cases, the analytical acoustic matrix, the ten multispecies/material cases, and the eight thermal/compressible cases. `cases/validate.py` checks the laminar cases; `cases/validate_turbulence.py --run` executes the turbulence matrix and writes `validation/metrics.csv`, comparison CSVs, and SVG plots. The detailed model-validation reports are under `validation/`.
 
 ### Current results
 
@@ -799,7 +961,17 @@ Run `make validate-acoustic` for 14 cavity, plane-wave, mean-flow, and pulse/out
 | Gaussian pulse at `t = 1` | Relative L2 error `2.05364%` |
 | Absorbing versus rigid outlet | Reflected/incident peak ratios `0.234999%` versus `99.558540%` |
 
-See `validation/acoustic_validation.md` for the complete metrics, contours, comparison plots, acceptance criteria, references, and limitations. `make validate` runs these checks after the existing laminar and turbulence regressions.
+See `validation/acoustic_validation.md` for the complete metrics, contours, comparison plots, acceptance criteria, references, and limitations. `make validate` runs the laminar, turbulence, acoustic, and multispecies checks.
+
+### Multispecies analytical and material validation
+
+`make validate-multispecies` runs three binary Stefan-tube grids, three unequal-diffusivity flux-correction grids, three transient three-species diffusion grids, and one uniform N₂/O₂ property case. The driver checks SIMPLE convergence, analytical mass-fraction profiles, grid-error reduction, boundedness, composition closure, continuity, ideal-gas density, Wilke viscosity, thermal conductivity, heat capacity, and diffusivity. It writes `validation/multispecies_metrics.csv`, comparison CSVs, and SVG profiles/convergence plots.
+
+The finest-grid relative L2 errors are approximately `3.41e-5` for Stefan diffusion, `4.14e-5` for unequal-diffusivity flux correction, and `2.28e-4` for transient three-species diffusion, with observed grid orders near two. The uniform air case gives `rho = 1.1719579191 kg/m³` and `mu = 1.8188965989e-5 Pa s`. These are analytical and material-rule verifications, not full Maxwell–Stefan, reacting-flow, or composition-driven low-Mach validation. See `validation/multispecies_validation.md` for equations, measured metrics, acceptance criteria, references, and limitations.
+
+### Boussinesq and compressible-flow validation
+
+`make validate-thermal` runs three de Vahl Davis natural-convection grids (`Ra = 10^4`, `Pr = 0.71`), zero-flow ideal-gas conduction, transient closed-volume heating, and three subsonic isentropic-nozzle grids. The driver checks coupled convergence, mass conservation, analytical temperature/pressure/density profiles, Nusselt number, mid-plane velocity maxima, and grid refinement. The finest cavity gives `Nu = 2.27680` versus `2.243` (`1.507%` error). The finest nozzle has pressure, density, temperature, and velocity relative L2 errors of `0.969%`, `1.003%`, `0.0741%`, and `0.695%`, respectively. See [`validation/thermal_compressible_validation.md`](validation/thermal_compressible_validation.md) for equations, all eight runs, acceptance criteria, source links, and model limitations.
 
 ### Cylinder vortex shedding and aeolian tone
 
@@ -852,9 +1024,12 @@ public:
 
 - Serial execution only; there is no domain decomposition or distributed PETSc matrix assembly.
 - Two-dimensional linear triangles and quadrilaterals only.
-- Constant density and dynamic viscosity.
+- Incompressible/Boussinesq transport uses reference density; ideal-gas compressible flow updates density from pressure and temperature. Passive species and mixture properties do not feed variable properties back into SIMPLE.
+- Compressible flow is limited to single-component laminar ideal gas with constant heat capacity and transport properties; there are no real-gas, temperature-dependent-property, compressible-turbulence, or dedicated shock-capturing models.
+- Multispecies transport is inert and isothermal, with constant or mixture-averaged Fick diffusion; no Maxwell–Stefan matrix, Soret/Dufour effects, reactions, or species-energy coupling.
+- VOF, algebraic-slip, Euler–Euler, and DPM modules are interfaces only; no multiphase field or particle solve is implemented.
 - Two-dimensional RANS only: three-dimensional secondary flow, swirl, and cross-sectional Dean vortices cannot be represented.
-- Only standard \(k\)-\(\varepsilon\) and SST-2003; no transition, compressibility, buoyancy, curvature/rotation correction, DES, or Reynolds-stress model.
+- Only standard \(k\)-\(\varepsilon\) and SST-2003; no transition, compressibility correction, buoyancy production, curvature/rotation correction, DES, or Reynolds-stress model.
 - No elastic field solver, fluid–structure coupling, or two-way fluid–acoustic coupling yet. The cylinder case is one-way Curle-type coupling.
 - Acoustic media and mean flow are currently uniform and steady; the implementation requires `|M| < 1`.
 - Acoustic absorption is a local first-order condition, not a PML; general frequency-dependent impedance and frequency-domain Helmholtz solves are not implemented.
@@ -863,13 +1038,17 @@ public:
 - No binary Gmsh input or binary Tecplot output.
 - No restart/checkpoint facility.
 - No variable-time-step BDF2 coefficients.
-- No automated grid-refinement, temporal-order, or manufactured-solution study yet.
+- Grid-refinement studies are case-specific; there is no complete Navier–Stokes manufactured-solution or temporal-order study yet.
 - The supplied validation meshes are deliberately modest in size and should not be treated as grid-independent production results.
 
 ## To-do work
 
 ### Physics modules and multiphysics coupling
 
+- [x] Add independent material models and passive multispecies transport with conservative flux closure.
+- [x] Define VOF, algebraic-slip, Euler–Euler, and DPM module interfaces.
+- [ ] Implement the multiphase solve routines and composition-driven low-Mach pressure coupling.
+- [ ] Add Maxwell–Stefan diffusion, species energy, and reaction-source interfaces.
 - [ ] Implement the two-dimensional elastic solid solver, including displacement, stress, traction, and fixed-displacement boundaries.
 - [x] Implement the two-dimensional acoustic solver with nodal pressure and dual-control-volume fluxes.
 - [x] Add configuration-driven physics selection in `main.cpp`.
@@ -893,7 +1072,8 @@ public:
 - [ ] Add bounded second-order convection with flux or gradient limiters.
 - [ ] Add additional convection schemes such as second-order upwind and QUICK.
 - [ ] Improve robustness of non-orthogonal corrections on highly skewed meshes.
-- [ ] Add variable-property density and viscosity fields where appropriate.
+- [x] Add ideal-gas density and cell-property fields to SIMPLE.
+- [ ] Add temperature-dependent viscosity, conductivity, and heat capacity where appropriate.
 - [ ] Add variable-step BDF2 and adaptive time-step control.
 - [ ] Add residual normalization based on problem scales in addition to absolute update tolerances.
 - [ ] Review and expand outlet/backflow treatments for strongly recirculating outflows.

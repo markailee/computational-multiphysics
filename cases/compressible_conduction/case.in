@@ -1,0 +1,42 @@
+mesh = mesh/conduction.msh
+output = results/conduction.plt
+flow_model = compressible
+material_model = ideal_gas
+time_scheme = steady
+
+gas_constant = 287.0
+viscosity = 1.8e-5
+thermal_conductivity = 0.025
+specific_heat = 1005.0
+initial_velocity = 0 0
+initial_pressure = 101325
+initial_temperature = 300
+viscous_dissipation = false
+
+gradient = least_squares
+convection_blending = 0.0
+energy_convection_blending = 0.0
+velocity_relaxation = 0.5
+pressure_relaxation = 0.3
+energy_relaxation = 1.0
+maximum_iterations = 1000
+tolerance = 1.0e-9
+energy_tolerance = 1.0e-9
+density_tolerance = 1.0e-10
+continuity_tolerance = 1.0e-12
+linear_tolerance = 1.0e-11
+linear_absolute_tolerance = 1.0e-14
+log_interval = 20
+
+[boundary.left]
+velocity = noSlip
+pressure = fixedValue 101325
+temperature = fixedValue 300
+[boundary.right]
+velocity = noSlip
+pressure = fixedValue 101325
+temperature = fixedValue 400
+[boundary.walls]
+velocity = noSlip
+pressure = zeroGradient
+temperature = adiabatic

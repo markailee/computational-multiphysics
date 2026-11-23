@@ -1,0 +1,41 @@
+mesh = mesh/air.msh
+output = results/air_properties.plt
+material_model = ideal_gas
+species_model = transport
+flow_coupling = passive
+species = N2 O2
+diffusion_model = mixture_averaged
+temperature = 300
+thermo_pressure = 101325
+density = 1.1719579191113527
+viscosity = 1.8188965989347983e-5
+initial_velocity = 0 0
+initial_mass_fractions = 0.7670824885424203 0.23291751145757966
+time_scheme = steady
+maximum_iterations = 100
+tolerance = 1.0e-11
+continuity_tolerance = 1.0e-12
+species_tolerance = 1.0e-12
+species_composition_tolerance = 1.0e-10
+linear_tolerance = 1.0e-12
+linear_absolute_tolerance = 1.0e-14
+
+[species.N2]
+molar_mass = 0.0280134
+viscosity = 1.76e-5
+thermal_conductivity = 0.0259
+specific_heat = 1040
+diffusivity = 2.0e-5
+[species.O2]
+molar_mass = 0.0319988
+viscosity = 2.04e-5
+thermal_conductivity = 0.0266
+specific_heat = 918
+diffusivity = 2.0e-5
+[binary_diffusion.N2]
+O2 = 2.0e-5
+
+[boundary.walls]
+velocity = noSlip
+pressure = zeroGradient
+mass_fractions = zeroGradient

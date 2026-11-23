@@ -1,0 +1,62 @@
+mesh = ../mesh/diffusion_coarse.msh
+output = results/diffusion_coarse.plt
+material_model = ideal_gas
+species_model = transport
+flow_coupling = passive
+species = A B C
+diffusion_model = mixture_averaged
+temperature = 300
+thermo_pressure = 89083.52805164186
+density = 1.0
+viscosity = 1.8e-5
+initial_velocity = 0 0
+initial_mass_fractions = 0.2 0.3 0.5
+time_scheme = bdf2
+dt = 0.0002
+end_time = 0.005
+maximum_steps = 1000
+output_interval = 25
+gradient = least_squares
+species_convection_blending = 0.0
+species_relaxation = 1.0
+maximum_iterations = 50
+tolerance = 1.0e-11
+continuity_tolerance = 1.0e-12
+species_tolerance = 1.0e-12
+species_composition_tolerance = 1.0e-11
+linear_tolerance = 1.0e-12
+linear_absolute_tolerance = 1.0e-14
+log_interval = 20
+
+[species.A]
+molar_mass = 0.028
+viscosity = 1.6e-5
+thermal_conductivity = 0.020
+specific_heat = 900
+diffusivity = 1.0e-3
+[species.B]
+molar_mass = 0.028
+viscosity = 1.8e-5
+thermal_conductivity = 0.025
+specific_heat = 1000
+diffusivity = 1.0e-3
+[species.C]
+molar_mass = 0.028
+viscosity = 2.1e-5
+thermal_conductivity = 0.030
+specific_heat = 1100
+diffusivity = 1.0e-3
+[binary_diffusion.A]
+B = 1.0e-3
+C = 1.0e-3
+[binary_diffusion.B]
+C = 1.0e-3
+
+[boundary.inlet]
+velocity = noSlip
+pressure = zeroGradient
+mass_fractions = fixedValue 0.6 0.2 0.2
+[boundary.walls]
+velocity = noSlip
+pressure = zeroGradient
+mass_fractions = zeroGradient

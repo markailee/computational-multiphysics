@@ -1,0 +1,46 @@
+mesh = ../mesh/cavity_fine.msh
+output = results/boussinesq_fine.plt
+flow_model = boussinesq
+material_model = constant
+time_scheme = steady
+
+density = 1.0
+viscosity = 0.71
+thermal_conductivity = 1.0
+specific_heat = 1.0
+thermal_expansion = 0.001
+reference_temperature = 300.5
+initial_temperature = 300.5
+gravity = 0 -7100000
+
+gradient = least_squares
+convection_blending = 0.0
+energy_convection_blending = 0.0
+velocity_relaxation = 0.3
+pressure_relaxation = 0.2
+energy_relaxation = 0.5
+maximum_iterations = 3000
+tolerance = 1.0e-4
+energy_tolerance = 1.0e-7
+continuity_tolerance = 1.0e-8
+linear_tolerance = 1.0e-10
+linear_absolute_tolerance = 1.0e-13
+maximum_linear_iterations = 1000
+log_interval = 50
+
+[boundary.hot]
+velocity = noSlip
+pressure = zeroGradient
+temperature = fixedValue 301.0
+[boundary.cold]
+velocity = noSlip
+pressure = zeroGradient
+temperature = fixedValue 300.0
+[boundary.bottom]
+velocity = noSlip
+pressure = zeroGradient
+temperature = adiabatic
+[boundary.top]
+velocity = noSlip
+pressure = zeroGradient
+temperature = adiabatic

@@ -691,6 +691,116 @@ $$
 
 不可压缩变密度驱动方腔、丙烷—空气同轴射流等验证问题表明，除速度和浓度云图外，还应比较截面组分剖面、轴向速度、混合长度和整体组分质量守恒。
 
+### 5.11.7 扩散通量修正的离散一致性
+
+为了保证所有组分方程之和严格回到总质量方程，可以给未修正的 Fick 通量增加一个共同的一致性修正：
+
+$$
+\mathbf j_k^0=-\rho D_{k,mix}\nabla y_k,
+\qquad
+\mathbf j_k=\mathbf j_k^0+y_k\sum_{l=1}^{N}\rho D_{l,mix}\nabla y_l .
+\tag{5.149a}
+$$
+
+由于 $\sum_k y_k=1$，立即可得
+
+$$
+\sum_k\mathbf j_k
+=-\sum_k\rho D_{k,mix}\nabla y_k
++\left(\sum_ky_k\right)\sum_l\rho D_{l,mix}\nabla y_l=0.
+\tag{5.149b}
+$$
+
+该修正是混合物平均近似的一种数值封闭，并不等价于完整 Maxwell–Stefan 方程，也不能产生后者可能出现的逆向扩散、渗透扩散或扩散障壁。若只求解 $N-1$ 个方程，则最后一个组分的通量必须由 $-\sum_{k<N}\mathbf j_k$ 计算，不能同时又随意指定一个独立的末组分扩散通量。
+
+本项目当前实现求解前 $N-1$ 个修正组分方程，并由 $y_N=1-\sum_{k<N}y_k$ 直接计算末组分。末组分不再独立求解，其扩散通量由 $-\sum_{k<N}\mathbf j_k$ 封闭；其扩散系数仍参与其他组分的修正式（5.149a）。修正式的第二项在 SIMPLE 外迭代中显式延迟。对每个内部面只构造一次带方向的修正通量 $J^c_{k,f}$，在拥有者单元右端加入 $-J^c_{k,f}$，在邻居单元右端加入 $+J^c_{k,f}$，因此内部面通量成对抵消。修正通量使用与未修正扩散项相同的法向梯度和非正交分解，湍流扩散系数也包含在同一封闭中。边界处采用与标量方程一致的 Dirichlet 或零法向扩散通量处理，末组分的边界值同样由质量分数约束计算。
+
+这种约束形式避免了同时求解全部 $N$ 个显式修正方程时可能出现的非物理组成定点。只要速度质量通量满足离散连续性，前 $N-1$ 个方程和末组分质量约束相加就与总质量方程一致。外迭代收敛判据仍必须同时包括所有组分的更新量、$\max_P|\sum_k y_{k,P}-1|$ 和质量分数上下界。不能通过每一步大幅裁剪负值来伪造有界性；高阶对流产生的显著越界应通过限制器、网格或格式选择处理。
+
+### 5.11.8 材料模块与多相/多组分软件框架
+
+材料模型与输运方程应分离。材料层只根据局部状态计算物性，不拥有速度、压力、体积分数或组分方程；输运层则不应包含某一套具体气体混合规则。本项目采用以下统一 SI 接口：
+
+| 接口数据 | 含义与单位 |
+|---|---|
+| `MaterialState::temperature` | 温度 $T$，K |
+| `MaterialState::pressure` | 热力学绝对压力，Pa；不同于不可压缩 SIMPLE 的表压或压力修正 |
+| `MaterialState::massFractions` | 组分质量分数 $y_k$ |
+| `MaterialState::volumeFractions` | 相体积分数 $C_k$ |
+| `SpeciesProperties::molarMass` | 摩尔质量，kg/mol |
+| `MaterialProperties::density` | 密度，kg/m³ |
+| `MaterialProperties::viscosity` | 动力黏度，Pa·s |
+| `MaterialProperties::thermalConductivity` | 导热系数，W/(m·K) |
+| `MaterialProperties::specificHeatCapacity` | 质量定压比热容，J/(kg·K) |
+| `MaterialProperties::speciesDiffusivities` | 分子扩散系数，m²/s |
+
+`src/material/` 中实现三类相互独立的材料模型：
+
+1. `ConstantMaterial`：常密度、常黏度纯流体，保持原有算例兼容；
+2. `IdealGasMixture`：根据式（5.145）计算密度，按 Wilke 规则计算黏度，按式（5.148）计算导热系数，按质量加权计算比热容；扩散系数可选择常数或式（5.149）的混合物平均近似；
+3. `VolumeFractionMixture`：以 $C_k$ 加权计算 $\rho_m=\sum C_k\rho_k$、$\mu_m=\sum C_k\mu_k$ 和本阶段的算术平均导热系数，以 $\sum C_k\rho_kc_{p,k}/\rho_m$ 计算质量比热容。该类只提供物性，不表示 VOF 或 Euler–Euler 方程已经实现。
+
+式（5.149）在纯组分极限下分子和分母同时趋于零。当前代码在该极限采用对应组分的已配置参考扩散系数，以避免奇异值；这只是数值极限处理，高压或非理想体系仍需更完整的扩散模型。
+
+`src/flow/MultiSpeciesModel.*` 负责质量分数场、边界、时间历史、对流—扩散、通量封闭、湍流 Schmidt 数和收敛诊断。`src/flow/multiphase/` 定义统一的 `MultiphaseModel` 生命周期和 `MultiphaseContext`，并分别给出 `VofModel`、`AlgebraicSlipModel`、`EulerEulerModel`、`DpmModel` 接口。上下文只传递网格、场、质量通量、材料和多组分模块的只读或受控访问，不让某一多相模型继承或修改 SIMPLE 内部矩阵。
+
+当前 `SimpleSolver` 的模块调用顺序为：
+
+1. 初始化材料、可选组分模块和可选多相模块；
+2. 外迭代开始，保存各模块上一次的场；
+3. 求解动量预测和压力修正，更新混合物质量通量；
+4. 调用可选多相模块，随后求解湍流方程；
+5. 调用可选多组分模块，使用当前质量通量和湍流扩散系数；
+6. 检查速度、压力、连续性、湍流、组分更新量和组分封闭，必要时继续外迭代；
+7. 时间步收敛后统一推进各模块的时间历史。
+
+本阶段只有**惰性组分的常密度、常黏度被动耦合**接入 SIMPLE。`rho_mix`、`mu_mix` 等材料输出用于物性验证和未来耦合，不能被误解为当前动量方程已经使用变密度。组分—密度低马赫反馈需要在压力修正中实现式（5.142）的散度源项；可压缩能量、化学反应和完整 Maxwell–Stefan 求解也不在本阶段范围内。VOF、代数滑移、Euler–Euler 和 DPM 的具体求解函数只保留接口，选择这些模型会明确抛出“未实现”异常，而不是静默退化为单相流。
+
+### 5.11.9 本阶段采用的标准验证问题
+
+**二元 Stefan 管。** 对具有相同摩尔质量的两种理想气体、常密度和常二元扩散系数，令 $A$ 从 $x=0$ 向 $x=L$ 扩散，$B$ 的总通量为零。由总质量通量与 Fick 扩散通量之和可得
+
+$$
+U=\frac{D}{L}\ln\frac{1-y_{A,L}}{1-y_{A,0}},
+\qquad
+y_A(x)=1-(1-y_{A,0})\exp\left(\frac{Ux}{D}\right),
+\qquad y_B=1-y_A .
+\tag{5.149c}
+$$
+
+本项目取 $L=0.1$ m、$D=2\times10^{-5}$ m²/s、$y_{A,0}=0.8$、$y_{A,L}=0.1$，因而 $U=3.00815479355\times10^{-4}$ m/s。该解析解同时检验对流、扩散、边界和两组分通量封闭。更一般的丙酮—甲醇—空气 Stefan 管包含不相等的分子量和三元 Maxwell–Stefan 扩散，可参考 [COMSOL Stefan Tube 模型文档](https://doc.comsol.com/6.1/doc/com.comsol.help.models.chem.stefan_tube/stefan_tube.html)；当前简化模型不与该三元实验结果混为一谈。
+
+**三组分瞬态扩散。** 初始均匀介质在 $x=0$ 处突然施加另一固定组成，半无限域的解为
+
+$$
+y_k(x,t)=y_{k,b}+(y_{k,0}-y_{k,b})
+\operatorname{erf}\left(\frac{x}{2\sqrt{Dt}}\right).
+\tag{5.149d}
+$$
+
+验证算例取三种等摩尔质量惰性组分和相同 $D=10^{-3}$ m²/s，使解析解与通量修正相容；$t=0.005$ s 时右端边界影响可忽略。三个组分同时求解可检查 BDF2 时间离散、空间精度、质量分数封闭和物性随组成的变化。相同二元扩散系数是该解析算例的必要假设，不是多组分模型的一般限制。
+
+**非零扩散修正的解析二元问题。** 为检验不同扩散系数下的非零修正项，令二元混合物无宏观流动，$D_A\ne D_B$，两端固定质量分数。由式（5.149a）得到
+
+$$
+J_A=-\rho\left[D_A(1-y_A)+D_By_A\right]\frac{\mathrm dy_A}{\mathrm dx}=\text{常数}.
+$$
+
+记 $y_0=y_A(0)$、$y_L=y_A(L)$，则解析隐式剖面为
+
+$$
+\frac{x}{L}=
+\frac{D_A(y_A-y_0)+\frac12(D_B-D_A)(y_A^2-y_0^2)}
+{D_A(y_L-y_0)+\frac12(D_B-D_A)(y_L^2-y_0^2)}.
+\tag{5.149e}
+$$
+
+验证算例取 $D_A=2\times10^{-5}$ m²/s、$D_B=5\times10^{-6}$ m²/s、$y_0=0.8$、$y_L=0.1$，并用单调二分反演式（5.149e）与数值结果比较。该问题直接覆盖非零修正通量，不能由相同扩散系数的 Stefan 管替代。
+
+**理想气体与 Wilke 物性。** 采用 300 K、101325 Pa 下摩尔分数为 0.79/0.21 的 N₂/O₂ 均匀混合物，分别核对质量—摩尔分数转换、式（5.145）、式（5.146）—（5.149）和质量加权比热容。均匀场避免了被动载体的近似影响物性验证。
+
+经典三元非 Fick 扩散实验可进一步采用 Duncan 和 Toor 的 H₂–N₂–CO₂ 双球实验（[NASA ADS 文献记录](https://ui.adsabs.harvard.edu/abs/1962AIChE...8...38D/abstract)），但必须先实现并验证 Maxwell–Stefan 矩阵通量，不能用当前独立 Fick 通量替代该实验的物理机制。
+
 ## 5.12 化学反应流
 
 ### 5.12.1 燃烧形式与控制方程
@@ -955,3 +1065,9 @@ $$
 6. Kee, R. J., Coltrin, M. E., and Glarborg, P. *Chemically Reacting Flow: Theory and Practice*. Wiley, 2003.
 7. Poinsot, T., and Veynante, D. *Theoretical and Numerical Combustion*. 3rd ed., 2011.
 8. Peters, N. *Turbulent Combustion*. Cambridge University Press, 2000.
+9. Wilke, C. R. A viscosity equation for gas mixtures. *Journal of Chemical Physics*, 1950, 18: 517–519. [DOI: 10.1063/1.1747673](https://doi.org/10.1063/1.1747673).
+10. Taylor, R., and Krishna, R. *Multicomponent Mass Transfer*. Wiley, 1993.
+11. Duncan, J. B., and Toor, H. L. An experimental study of three component gas diffusion. *AIChE Journal*, 1962, 8: 38–41. [NASA ADS record](https://ui.adsabs.harvard.edu/abs/1962AIChE...8...38D/abstract).
+12. Crank, J. *The Mathematics of Diffusion*. 2nd ed., Oxford University Press, 1975.
+13. Krishna, R., and Wesselingh, J. A. The Maxwell–Stefan approach to mass transfer. *Chemical Engineering Science*, 1997, 52: 861–911.
+14. [COMSOL Application Library: Stefan Tube](https://doc.comsol.com/6.1/doc/com.comsol.help.models.chem.stefan_tube/stefan_tube.html). 包含三元 Stefan 管的模型方程、二元扩散系数和实验对比设置。
