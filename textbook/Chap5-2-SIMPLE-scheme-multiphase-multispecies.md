@@ -608,7 +608,25 @@ $$
 
 ### 5.11.4 可压缩多组分控制方程
 
-可压缩多组分气体满足总质量、动量、组分和总焓方程。定义
+可压缩多组分气体必须联立总质量、动量、组分和能量守恒。采用前文 $\mathbf j_k$ 为组分扩散质量通量、$\dot\omega_k$ 为组分质量净生成率的记号，并满足 $\sum_k\mathbf j_k=0$、$\sum_k\dot\omega_k=0$，控制方程可概括为
+
+$$
+\frac{\partial\rho}{\partial t}+\nabla\cdot(\rho\mathbf V)=0,
+$$
+
+$$
+\frac{\partial\rho\mathbf V}{\partial t}
++\nabla\cdot(\rho\mathbf V\otimes\mathbf V)
+=-\nabla p+\nabla\cdot\boldsymbol\tau+\rho\mathbf f,
+$$
+
+$$
+\frac{\partial\rho y_k}{\partial t}
++\nabla\cdot(\rho\mathbf Vy_k)
+=-\nabla\cdot\mathbf j_k+\dot\omega_k .
+$$
+
+选择能量变量时应区分流动类型：组分扩散主导的等温低马赫模型可只求解组分方程，低马赫非等温模型可使用静焓；具有显著压缩功、动能变化或激波的可压缩多组分流动应求解总能或总焓。定义总比焓
 
 $$
 H=\sum_ky_kh_k+\frac12|\mathbf V|^2,
@@ -617,7 +635,7 @@ h_k=h_{f,k}^0+\int_{T_0}^Tc_{p,k}(T')\,\mathrm dT',
 \tag{5.143}
 $$
 
-其中 $h_{f,k}^0$ 为参考生成焓。总焓方程可写为
+其中 $h_{f,k}^0$ 为参考生成焓，积分部分为显焓。对应的总焓方程为
 
 $$
 \frac{\partial\rho H}{\partial t}
@@ -625,11 +643,13 @@ $$
 =\frac{\partial p}{\partial t}
 +\nabla\cdot\left(\lambda\nabla T-\sum_kh_k\mathbf j_k\right)
 +\nabla\cdot(\boldsymbol\tau\cdot\mathbf V)
--\sum_kh_{f,k}^0\dot\omega_k.
++\rho\mathbf f\cdot\mathbf V+S_q .
 \tag{5.144}
 $$
 
-右端第二项包含热传导和组分扩散携带的焓，最后一项是化学反应引起的能量变化。若使用相对焓 $\widetilde h_k=h_k-h_{f,k}^0$ 构造 $\widetilde H=\sum_ky_k\widetilde h_k+|\mathbf V|^2/2$，生成焓基准移入化学反应源项，能量方程的形式和源项解释会更清晰。
+右端依次是非定常压力项、热传导、组分扩散携带的焓、黏性功、体积力功和外加热源。组分扩散不能简单忽略：即使 $\sum_k\mathbf j_k=0$，由于各组分 $h_k$ 不同，$\sum_kh_k\mathbf j_k$ 一般并不为零。若采用湍流封闭，还应以一致的有效热通量加入湍流热输运和组分焓扩散模型。
+
+**式（5.144）不再含独立的化学反应热源。** 因为 $h_k$ 已包含生成焓，反应引起的化学能变化通过 $y_k$ 和 $h_k$ 的变化进入总焓；再附加 $-\sum_kh_{f,k}^0\dot\omega_k$ 会重复计算反应热。只有改用显焓 $\widetilde h_k=h_k-h_{f,k}^0$ 和 $\widetilde H=\sum_ky_k\widetilde h_k+|\mathbf V|^2/2$ 时，才把生成焓基准差移到源项，此时方程使用 $-\sum_k\widetilde h_k\mathbf j_k$ 的扩散项，并出现 $-\sum_kh_{f,k}^0\dot\omega_k$。两种写法等价，但焓定义、扩散通量和源项必须成套切换。
 
 理想气体混合物满足
 
@@ -641,7 +661,15 @@ R_{mix}=R_u\sum_k\frac{y_k}{M_k}
 \tag{5.145}
 $$
 
-其中 $M_k$ 为摩尔质量，$R_u$ 为通用气体常数。混合物摩尔质量满足 $M_{mix}^{-1}=\sum_ky_k/M_k$。
+其中 $M_k$ 为摩尔质量，$R_u$ 为通用气体常数，$M_{mix}^{-1}=\sum_ky_k/M_k$。总焓求解后，温度由非线性代数关系
+
+$$
+H-\frac12|\mathbf V|^2=\sum_ky_kh_k(T)
+$$
+
+恢复。变比热时可采用 $T^{m+1}=T^m+[H-|\mathbf V|^2/2-\sum_ky_kh_k(T^m)]/c_{p,mix}(T^m)$ 的牛顿迭代，其中 $c_{p,mix}=\sum_ky_kc_{p,k}$；随后由最新 $p,T,y_k$ 更新密度和物性。定温进口给定 $H_b=\sum_ky_{k,b}h_k(T_b)+|\mathbf V_b|^2/2$，绝热壁面则约束静温梯度而非笼统地令总焓梯度为零。
+
+分离式 SIMPLE 中，组分、动量和总焓方程必须使用同一套压力修正后界面质量流量，内部面的对流与扩散通量分别守恒。外迭代收敛时还应检查 $\sum_ky_k=1$、$\sum_k\mathbf j_k=0$、$H=\sum_ky_kh_k+|\mathbf V|^2/2$、状态方程以及整体质量和能量平衡；只检查温度或浓度残差不足以证明可压缩多组分耦合已经收敛。
 
 ### 5.11.5 混合物物性
 
@@ -685,7 +713,7 @@ $$
 1. 求解可压缩 Navier–Stokes 方程，得到速度和压力；
 2. 在密度暂时固定的条件下求解组分输运方程，并保证质量分数归一和扩散通量相容；
 3. 更新 $\rho$、$R_{mix}$、$\mu_{eff}$、$\lambda_{eff}$ 和 $D_{k,mix}$；
-4. 求解包含组分焓扩散和化学源项的能量方程；
+4. 求解包含组分焓扩散的总焓方程；仅在显焓基准下加入相应的生成焓反应源项，随后恢复温度；
 5. 求解湍流方程并更新有效黏度和扩散系数；
 6. 重复至速度、压力、组分、温度和物性收敛。
 

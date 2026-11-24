@@ -1,5 +1,6 @@
 #pragma once
 
+#include "fvm/Config.hpp"
 #include "fvm/Field.hpp"
 
 #include <memory>
@@ -30,6 +31,12 @@ public:
     std::vector<ScalarGradient> scalar(const ScalarField& field) const override;
     std::vector<VectorGradient> vector(const VectorField& field) const override;
 };
+
+bool useBarthJespersenLimiter(const Config& config);
+std::vector<ScalarGradient> applyBarthJespersenLimiter(const ScalarField& field,
+                                                       std::vector<ScalarGradient> gradients);
+std::vector<VectorGradient> applyBarthJespersenLimiter(const VectorField& field,
+                                                       std::vector<VectorGradient> gradients);
 
 std::unique_ptr<GradientScheme> makeGradientScheme(const std::string& name);
 

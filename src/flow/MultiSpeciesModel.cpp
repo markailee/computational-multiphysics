@@ -19,7 +19,6 @@ MultiSpeciesModel::MultiSpeciesModel(const Mesh& mesh, const Config& config,
       temperature_(config.number("temperature", 300.0)),
       thermodynamicPressure_(config.number("thermo_pressure", 101325.0)),
       relaxation_(config.number("species_relaxation", 0.7)),
-      convectionBlending_(config.number("species_convection_blending", 0.0)),
       turbulentSchmidt_(config.number("turbulent_schmidt", 0.7)),
       linearRelativeTolerance_(config.number("linear_tolerance", 1.0e-9)),
       linearAbsoluteTolerance_(config.number("linear_absolute_tolerance", 1.0e-12)),
@@ -40,9 +39,6 @@ MultiSpeciesModel::MultiSpeciesModel(const Mesh& mesh, const Config& config,
         throw std::runtime_error("temperature and thermo_pressure must be positive");
     }
     if (relaxation_ <= 0.0 || relaxation_ > 1.0) throw std::runtime_error("species_relaxation must be in (0, 1]");
-    if (convectionBlending_ < 0.0 || convectionBlending_ > 1.0) {
-        throw std::runtime_error("species_convection_blending must be between zero and one");
-    }
     if (!(turbulentSchmidt_ > 0.0)) throw std::runtime_error("turbulent_schmidt must be positive");
 
     const std::vector<double> initial = material::readFractions(config, "initial_mass_fractions", speciesCount_);
@@ -236,9 +232,10 @@ void MultiSpeciesModel::solve(double dt, bool hasOldOld, const std::vector<doubl
     for (std::size_t k = 0; k + 1 < speciesCount_; ++k) {
         ScalarTransportEquation equation{fields_[k], previousFields_[k], oldFields_[k], oldOldFields_[k],
             massFlux, diffusivities_[k], source_, destruction_, constrainedCells_, constrainedValues_,
-            carrierDensity, time, relaxation_, convectionBlending_, linearRelativeTolerance_,
+            carrierDensity, time, relaxation_, linearRelativeTolerance_,
             linearAbsoluteTolerance_, maximumLinearIterations_, config_.get("species_ksp", "bcgs"),
             config_.get("species_pc", "ilu")};
+        equation.barthJespersen = useBarthJespersenLimiter(config_);
         equation.additionalFaceFlux = &correctionFluxes_[k];
         const LinearSolveInfo info = solveScalarTransport(mesh_, gradient, transportSystem_, equation);
         linearIterations_ += info.iterations;

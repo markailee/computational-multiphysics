@@ -24,7 +24,6 @@ struct ScalarTransportEquation {
     double density = 1.0;
     TimeCoefficients time;
     double relaxation = 0.7;
-    double convectionBlending = 0.0;
     double linearRelativeTolerance = 1.0e-9;
     double linearAbsoluteTolerance = 1.0e-12;
     int maximumLinearIterations = 1000;
@@ -34,6 +33,8 @@ struct ScalarTransportEquation {
     const std::vector<double>* densityField = nullptr;
     const std::vector<double>* oldDensityField = nullptr;
     const std::vector<double>* oldOldDensityField = nullptr;
+    bool barthJespersen = false;
+    bool secondOrderConvection = true;
 };
 
 LinearSolveInfo solveScalarTransport(const Mesh& mesh, const GradientScheme& gradient,

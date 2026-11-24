@@ -1,7 +1,7 @@
 case,family,level,h,dt,relative_l2,observed_order
-stefan_coarse,stefan,coarse,0.005,,0.0005703336846335606,
-stefan_medium,stefan,medium,0.0025,,0.00013854013334451472,2.0415022750932157
-stefan_fine,stefan,fine,0.00125,,3.412450971623771e-05,2.0214237441581093
+stefan_coarse,stefan,coarse,0.005,,0.0005762916489460101,
+stefan_medium,stefan,medium,0.0025,,0.0001393346099585347,2.048245453705659
+stefan_fine,stefan,fine,0.00125,,3.422666921430116e-05,2.0253608523566142
 correction_coarse,correction,coarse,0.005,,0.0006600296230137151,
 correction_medium,correction,medium,0.0025,,0.0001653481173576214,1.997024156815091
 correction_fine,correction,fine,0.00125,,4.135847218172476e-05,1.9992518218669437

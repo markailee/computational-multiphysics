@@ -89,7 +89,6 @@ private:
     double viscosity_;
     TurbulenceModelKind kind_;
     double relaxation_;
-    double convectionBlending_;
     double minimumK_;
     double minimumEpsilon_;
     double minimumOmega_;

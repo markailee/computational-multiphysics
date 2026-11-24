@@ -8,7 +8,6 @@
 #include <fstream>
 #include <iomanip>
 #include <iostream>
-#include <limits>
 #include <stdexcept>
 #include <string>
 
@@ -25,7 +24,9 @@ FlowModel readFlowModel(const Config& config) {
 
 double initialFlowPressure(const Config& config) {
     if (config.has("initial_pressure")) return config.number("initial_pressure", 0.0);
-    return readFlowModel(config) == FlowModel::Compressible ? config.number("thermo_pressure", 101325.0) : 0.0;
+    const FlowModel model = readFlowModel(config);
+    return model == FlowModel::Compressible
+        ? config.number("thermo_pressure", 101325.0) : 0.0;
 }
 
 } // namespace
@@ -36,7 +37,7 @@ SimpleSolver::SimpleSolver(const Mesh& mesh, const Config& config, std::filesyst
       density_(config.number("density", 1.0)), viscosity_(config.number("viscosity", 0.01)),
       velocityRelaxation_(config.number("velocity_relaxation", 0.7)),
       pressureRelaxation_(config.number("pressure_relaxation", 0.3)),
-      convectionBlending_(config.number("convection_blending", 1.0)),
+      barthJespersenLimiter_(useBarthJespersenLimiter(config)),
       outerTolerance_(config.number("tolerance", 1.0e-6)),
       continuityTolerance_(config.number("continuity_tolerance", 1.0e-8)),
       linearRelativeTolerance_(config.number("linear_tolerance", 1.0e-9)),
@@ -66,9 +67,6 @@ SimpleSolver::SimpleSolver(const Mesh& mesh, const Config& config, std::filesyst
     if (velocityRelaxation_ <= 0.0 || velocityRelaxation_ > 1.0 ||
         pressureRelaxation_ <= 0.0 || pressureRelaxation_ > 1.0) {
         throw std::runtime_error("SIMPLE relaxation factors must be in (0, 1]");
-    }
-    if (convectionBlending_ < 0.0 || convectionBlending_ > 1.0) {
-        throw std::runtime_error("convection_blending must be between zero (upwind) and one (central)");
     }
     if (flowModel_ == FlowModel::Boussinesq) {
         if (material_->kind() != MaterialKind::Constant) {
@@ -123,15 +121,16 @@ SimpleSolver::SimpleSolver(const Mesh& mesh, const Config& config, std::filesyst
 
 void SimpleSolver::initialize() {
     if (initialized_) return;
+    if (config_.has("restart")) readRestart(caseDirectory_ / config_.require("restart"));
     oldVelocity_.values() = velocity_.values();
     oldOldVelocity_.values() = velocity_.values();
     oldPressure_.values() = pressure_.values();
     oldOldPressure_.values() = pressure_.values();
-    if (energy_) energy_->initialize();
+    updateMaterialProperties();
+    updateBoundaries();
+    if (energy_) energy_->initialize(velocity_, heatCapacityField_);
     if (multiSpecies_) multiSpecies_->initialize();
     if (multiphase_) multiphase_->initialize(*material_);
-    updateBoundaries();
-    updateMaterialProperties();
     oldDensityField_ = densityField_;
     oldOldDensityField_ = densityField_;
     previousDensityField_ = densityField_;
@@ -141,6 +140,67 @@ void SimpleSolver::initialize() {
               << mesh_.nodes.size() << " nodes\n";
 }
 
+void SimpleSolver::readRestart(const std::filesystem::path& file) {
+    std::ifstream input(file);
+    if (!input) throw std::runtime_error("Cannot open restart file: " + file.string());
+    std::vector<std::string> names;
+    std::string line;
+    std::size_t cellOffset = 0;
+    bool foundZone = false;
+    bool foundTemperature = false;
+    while (std::getline(input, line)) {
+        if (line.rfind("VARIABLES", 0) == 0) {
+            names.clear();
+            std::size_t start = line.find('"');
+            while (start != std::string::npos) {
+                const std::size_t end = line.find('"', start + 1);
+                if (end == std::string::npos) throw std::runtime_error("Invalid variable list in restart file");
+                names.push_back(line.substr(start + 1, end - start - 1));
+                start = line.find('"', end + 1);
+            }
+            continue;
+        }
+        if (line.rfind("ZONE", 0) != 0) continue;
+        if (names.size() < 3) throw std::runtime_error("Restart zone has no cell-centered fields");
+        const std::size_t nPosition = line.find("N=");
+        const std::size_t ePosition = line.find("E=");
+        if (nPosition == std::string::npos || ePosition == std::string::npos) {
+            throw std::runtime_error("Cannot read restart zone dimensions");
+        }
+        const int nodeCount = std::stoi(line.substr(nPosition + 2));
+        const int cellCount = std::stoi(line.substr(ePosition + 2));
+        if (nodeCount < 0 || cellCount < 0 || cellOffset + static_cast<std::size_t>(cellCount) > mesh_.cells.size()) {
+            throw std::runtime_error("Restart cell count does not match the mesh");
+        }
+        std::vector<double> values(nodeCount);
+        for (int component = 0; component < 2; ++component) {
+            for (int node = 0; node < nodeCount; ++node) input >> values[node];
+        }
+        for (std::size_t variable = 2; variable < names.size(); ++variable) {
+            values.resize(cellCount);
+            for (int cell = 0; cell < cellCount; ++cell) input >> values[cell];
+            if (!input) throw std::runtime_error("Unexpected end of restart data");
+            for (int cell = 0; cell < cellCount; ++cell) {
+                const std::size_t target = cellOffset + static_cast<std::size_t>(cell);
+                if (names[variable] == "U_x") velocity_[target].x = values[cell];
+                else if (names[variable] == "U_y") velocity_[target].y = values[cell];
+                else if (names[variable] == "p") pressure_[target] = values[cell];
+                else if (names[variable] == "T" && energy_) {
+                    energy_->temperature()[target] = values[cell];
+                    foundTemperature = true;
+                }
+            }
+        }
+        cellOffset += static_cast<std::size_t>(cellCount);
+        foundZone = true;
+    }
+    if (!foundZone || cellOffset != mesh_.cells.size()) {
+        throw std::runtime_error("Restart cell count does not match the mesh");
+    }
+    if (energy_ && !foundTemperature) throw std::runtime_error("Restart file has no temperature field");
+    std::cout << "Restart: " << file << '\n';
+}
+
 void SimpleSolver::updateBoundaries() {
     for (std::size_t face = mesh_.internalFaceCount(); face < mesh_.faces.size(); ++face) {
         const int owner = mesh_.faces[face].owner;
@@ -148,11 +208,12 @@ void SimpleSolver::updateBoundaries() {
         velocity_.boundaryDirichlet(face) = boundaryConditions_.fixedVelocity(face);
         pressure_.boundary(face) = boundaryConditions_.pressure(face, pressure_[owner]);
         pressure_.boundaryDirichlet(face) = boundaryConditions_.fixedPressure(face);
-        if (flowModel_ == FlowModel::Compressible && !(pressure_.boundary(face) > 0.0)) {
+        if ((flowModel_ == FlowModel::Compressible) &&
+            !(pressure_.boundary(face) > 0.0)) {
             throw std::runtime_error("Compressible boundary pressure must be absolute and positive");
         }
     }
-    if (energy_) energy_->updateBoundaries();
+    if (energy_) energy_->updateBoundaries(velocity_, heatCapacityField_);
     if (turbulence_) turbulence_->updateBoundaries();
 }
 
@@ -169,17 +230,20 @@ void SimpleSolver::updateMaterialProperties() {
             continue;
         }
         state.temperature = energy_ ? energy_->temperature()[cell] : config_.number("temperature", 300.0);
-        state.pressure = flowModel_ == FlowModel::Compressible ? pressure_[cell] : config_.number("thermo_pressure", 101325.0);
+        state.pressure = flowModel_ == FlowModel::Compressible
+            ? pressure_[cell] : config_.number("thermo_pressure", 101325.0);
         const MaterialProperties properties = material_->properties(state);
         if (!(properties.density > 0.0) || properties.viscosity < 0.0 ||
             properties.thermalConductivity < 0.0 || properties.specificHeatCapacity < 0.0) {
             throw std::runtime_error("Material returned invalid flow properties");
         }
-        densityField_[cell] = flowModel_ == FlowModel::Compressible ? properties.density : density_;
+        densityField_[cell] = flowModel_ == FlowModel::Compressible
+            ? properties.density : density_;
         viscosityField_[cell] = properties.viscosity;
         conductivityField_[cell] = properties.thermalConductivity;
         heatCapacityField_[cell] = properties.specificHeatCapacity;
-        pressureDerivativeField_[cell] = flowModel_ == FlowModel::Compressible ? densityField_[cell] / pressure_[cell] : 0.0;
+        pressureDerivativeField_[cell] = flowModel_ == FlowModel::Compressible
+            ? densityField_[cell] / pressure_[cell] : 0.0;
     }
 }
 
@@ -222,6 +286,12 @@ void SimpleSolver::computeMassFlux(bool rhieChow) {
 
 LinearSolveInfo SimpleSolver::solveMomentum(double dt) {
     const auto velocityGradient = gradient_->vector(velocity_);
+    std::vector<VectorGradient> limitedVelocityGradient;
+    const std::vector<VectorGradient>* convectionGradient = &velocityGradient;
+    if (barthJespersenLimiter_) {
+        limitedVelocityGradient = applyBarthJespersenLimiter(velocity_, velocityGradient);
+        convectionGradient = &limitedVelocityGradient;
+    }
     const auto pressureGradient = gradient_->scalar(pressure_);
     std::vector<ScalarGradient> kineticEnergyGradient;
     if (turbulence_) kineticEnergyGradient = gradient_->scalar(turbulence_->k());
@@ -300,8 +370,8 @@ LinearSolveInfo SimpleSolver::solveMomentum(double dt) {
         matrix.add(neighbour, neighbour, convection.neighbourDiagonal);
         matrix.add(neighbour, owner, convection.neighbourToOwner);
         const Vector2 upwind = flux >= 0.0 ? velocity_[owner] : velocity_[neighbour];
-        const Vector2 central = centralFaceValue(mesh_, velocity_, velocityGradient, faceIndex);
-        const Vector2 deferred = (convectionBlending_ * flux) * (central - upwind);
+        const Vector2 reconstructed = secondOrderUpwindFaceValue(mesh_, velocity_, *convectionGradient, faceIndex, flux);
+        const Vector2 deferred = flux * (reconstructed - upwind);
         rhs[owner] -= deferred;
         rhs[neighbour] += deferred;
     }
@@ -329,12 +399,11 @@ LinearSolveInfo SimpleSolver::solveMomentum(double dt) {
         }
 
         const double flux = massFlux_[faceIndex];
-        const Vector2 central = centralFaceValue(mesh_, velocity_, velocityGradient, faceIndex);
-        const Vector2 upwind = flux >= 0.0 ? velocity_[owner] : central;
+        const Vector2 upwind = flux >= 0.0 ? velocity_[owner] : velocity_.boundary(faceIndex);
+        const Vector2 reconstructed = secondOrderUpwindFaceValue(mesh_, velocity_, *convectionGradient, faceIndex, flux);
         if (flux >= 0.0) matrix.add(owner, owner, flux);
-        else rhs[owner] -= flux * central;
-        const Vector2 deferred = (convectionBlending_ * flux) * (central - upwind);
-        rhs[owner] -= deferred;
+        else rhs[owner] -= flux * upwind;
+        rhs[owner] -= flux * (reconstructed - upwind);
     }
 
     for (int cell = 0; cell < cellCount; ++cell) {
@@ -404,8 +473,13 @@ LinearSolveInfo SimpleSolver::correctPressure(double dt) {
     }
     for (std::size_t faceIndex = mesh_.internalFaceCount(); faceIndex < mesh_.faces.size(); ++faceIndex) {
         const Face& face = mesh_.faces[faceIndex];
-        if (boundaryConditions_.fixedPressure(faceIndex)) {
-            const double coefficient = rhieChowCoefficient(mesh_, faceIndex, momentumDiagonal_, faceDensity(faceIndex));
+        const double density = faceDensity(faceIndex);
+        if (boundaryConditions_.fixedPressure(faceIndex) && !boundaryConditions_.fixedVelocity(faceIndex)) {
+            const double coefficient = rhieChowCoefficient(mesh_, faceIndex, momentumDiagonal_, density);
+            matrix.add(face.owner, face.owner, coefficient);
+        } else if (compressible && !boundaryConditions_.fixedPressure(faceIndex) &&
+                   !boundaryConditions_.fixedVelocity(faceIndex) && massFlux_[faceIndex] > 0.0) {
+            const double coefficient = massFlux_[faceIndex] / density * pressureDerivativeField_[face.owner];
             matrix.add(face.owner, face.owner, coefficient);
         }
         rhs[face.owner] -= massFlux_[faceIndex];
@@ -423,8 +497,13 @@ LinearSolveInfo SimpleSolver::correctPressure(double dt) {
 
     for (std::size_t faceIndex = mesh_.internalFaceCount(); faceIndex < mesh_.faces.size(); ++faceIndex) {
         const int owner = mesh_.faces[faceIndex].owner;
-        pressureCorrection_.boundary(faceIndex) = boundaryConditions_.fixedPressure(faceIndex) ? 0.0 : pressureCorrection_[owner];
-        pressureCorrection_.boundaryDirichlet(faceIndex) = boundaryConditions_.fixedPressure(faceIndex);
+        // A prescribed boundary velocity requires u_b' = 0, i.e. homogeneous Neumann for p'
+        // (zero normal pressure-correction gradient), even when the static pressure is also
+        // prescribed. Only a fixed-pressure boundary with an extrapolated velocity uses p_b' = 0.
+        const bool correctionDirichlet = boundaryConditions_.fixedPressure(faceIndex) &&
+            !boundaryConditions_.fixedVelocity(faceIndex);
+        pressureCorrection_.boundary(faceIndex) = correctionDirichlet ? 0.0 : pressureCorrection_[owner];
+        pressureCorrection_.boundaryDirichlet(faceIndex) = correctionDirichlet;
     }
     const auto correctionGradient = gradient_->scalar(pressureCorrection_);
     for (int cell = 0; cell < cellCount; ++cell) {
@@ -449,9 +528,15 @@ LinearSolveInfo SimpleSolver::correctPressure(double dt) {
     }
     for (std::size_t faceIndex = mesh_.internalFaceCount(); faceIndex < mesh_.faces.size(); ++faceIndex) {
         const int owner = mesh_.faces[faceIndex].owner;
-        if (boundaryConditions_.fixedPressure(faceIndex)) {
-            const double coefficient = rhieChowCoefficient(mesh_, faceIndex, momentumDiagonal_, faceDensity(faceIndex));
+        const double density = faceDensity(faceIndex);
+        const double predictedMassFlux = massFlux_[faceIndex];
+        if (boundaryConditions_.fixedPressure(faceIndex) && !boundaryConditions_.fixedVelocity(faceIndex)) {
+            const double coefficient = rhieChowCoefficient(mesh_, faceIndex, momentumDiagonal_, density);
             massFlux_[faceIndex] += coefficient * pressureCorrection_[owner];
+        } else if (compressible && !boundaryConditions_.fixedPressure(faceIndex) &&
+                   !boundaryConditions_.fixedVelocity(faceIndex) && predictedMassFlux > 0.0) {
+            massFlux_[faceIndex] += predictedMassFlux / density * pressureDerivativeField_[owner] *
+                pressureCorrection_[owner];
         }
     }
     updateBoundaries();
@@ -554,7 +639,7 @@ FlowDiagnostics SimpleSolver::solveStep(double dt, int maximumIterations) {
             (!multiSpecies_ || (diagnostics.speciesChange < speciesTolerance &&
                 diagnostics.speciesCompositionError < compositionTolerance &&
                 multiSpecies_->bounded(compositionTolerance))) &&
-            (!energy_ || diagnostics.temperatureChange < energyTolerance) &&
+            (!energy_ || (diagnostics.temperatureChange < energyTolerance && !energy_->temperatureLimited())) &&
             (flowModel_ != FlowModel::Compressible || diagnostics.densityChange < densityTolerance);
         if (iteration == 1 || iteration % logInterval == 0 || diagnostics.converged || iteration == maximumIterations) {
             std::cout << (timeDerivative_.isSteady() ? "SIMPLE " : "  outer ")
@@ -562,7 +647,8 @@ FlowDiagnostics SimpleSolver::solveStep(double dt, int maximumIterations) {
                       << "  dp=" << diagnostics.pressureChange << "  dTurb=" << diagnostics.turbulenceChange
                       << "  continuity=" << diagnostics.maxCellImbalance;
             if (energy_) {
-                std::cout << "  dTemp=" << diagnostics.temperatureChange << "  drho=" << diagnostics.densityChange;
+                std::cout << "  dTemp=" << diagnostics.temperatureChange << "  drho=" << diagnostics.densityChange
+                          << "  Tlimit=" << energy_->temperatureLimited();
             }
             if (multiSpecies_) {
                 std::cout << "  dY=" << diagnostics.speciesChange << "  Ysum=" << diagnostics.speciesCompositionError;
@@ -651,7 +737,7 @@ void SimpleSolver::write(const std::filesystem::path& file) const {
     ScalarField imbalance("mass_imbalance", mesh_);
     imbalance.values() = lastImbalance_;
     std::map<std::string, const ScalarField*> scalars{{"p", &pressure_}, {"mass_imbalance", &imbalance}};
-    ScalarField density("rho", mesh_), conductivity("lambda", mesh_), heatCapacity("cp", mesh_);
+    ScalarField density("rho", mesh_), conductivity("lambda", mesh_), heatCapacity("cp", mesh_), mach("Mach", mesh_);
     if (flowModel_ != FlowModel::Incompressible) {
         density.values() = densityField_;
         conductivity.values() = conductivityField_;
@@ -660,7 +746,16 @@ void SimpleSolver::write(const std::filesystem::path& file) const {
         scalars["lambda"] = &conductivity;
         scalars["cp"] = &heatCapacity;
     }
+    if (flowModel_ == FlowModel::Compressible) {
+        const double gasConstant = config_.number("gas_constant", 287.0);
+        for (std::size_t cell = 0; cell < mesh_.cells.size(); ++cell) {
+            const double gamma = heatCapacityField_[cell] / (heatCapacityField_[cell] - gasConstant);
+            mach[cell] = norm(velocity_[cell]) / std::sqrt(gamma * pressure_[cell] / densityField_[cell]);
+        }
+        scalars["Mach"] = &mach;
+    }
     if (energy_) scalars["T"] = &energy_->temperature();
+    if (flowModel_ == FlowModel::Compressible) scalars["H0"] = &energy_->totalEnthalpy();
     ScalarField vorticity("vorticity", mesh_);
     if (config_.boolean("output_vorticity", false)) {
         const std::vector<VectorGradient> gradient = gradient_->vector(velocity_);
@@ -738,6 +833,7 @@ void SimpleSolver::run() {
     const double endTime = config_.number("end_time", 1.0);
     const int maximumSteps = config_.integer("maximum_steps", 1000000);
     const int outputInterval = config_.integer("output_interval", 10);
+    const bool allowIncomplete = config_.boolean("allow_incomplete_time_steps", false);
     if (dt <= 0.0 || endTime <= 0.0) throw std::runtime_error("dt and end_time must be positive");
     bool wroteSummary = false;
     if (forcePatch_ >= 0) writeForceHistory(forceFile(), currentTime_, false);
@@ -748,7 +844,11 @@ void SimpleSolver::run() {
             break;
         }
         const double stepSize = std::min(dt, endTime - currentTime_);
-        const FlowDiagnostics result = solveStep(stepSize, config_.integer("maximum_iterations", 100));
+        const bool finalStep = currentTime_ + stepSize >= endTime - 1.0e-12;
+        const int iterationLimit = finalStep
+            ? config_.integer("final_maximum_iterations", config_.integer("maximum_iterations", 100))
+            : config_.integer("maximum_iterations", 100);
+        const FlowDiagnostics result = solveStep(stepSize, iterationLimit);
         currentTime_ += stepSize;
         ++step;
         updateTimeHistory();
@@ -760,7 +860,9 @@ void SimpleSolver::run() {
                 (output.stem().string() + "_" + std::to_string(step) + output.extension().string());
             write(stepFile);
         }
-        if (!result.converged) throw std::runtime_error("SIMPLE did not converge at time " + std::to_string(currentTime_));
+        if (!result.converged && (!allowIncomplete || finalStep)) {
+            throw std::runtime_error("SIMPLE did not converge at time " + std::to_string(currentTime_));
+        }
     }
     if (currentTime_ < endTime - 1.0e-12) throw std::runtime_error("maximum_steps reached before end_time");
     std::cout << "Tecplot output: " << output.parent_path() << '\n';

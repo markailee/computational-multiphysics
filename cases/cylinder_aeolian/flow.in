@@ -14,7 +14,6 @@ viscosity = 0.006666666666666667
 initial_velocity = 1 0.01
 initial_pressure = 0.0
 gradient = least_squares
-convection_blending = 1.0
 velocity_relaxation = 0.7
 pressure_relaxation = 0.3
 maximum_iterations = 100

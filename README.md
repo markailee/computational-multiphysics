@@ -2,9 +2,11 @@
 
 A C++17 finite-volume project for two-dimensional multiphysics calculations on unstructured meshes. The executable implements **incompressible, Boussinesq thermal-dilation, and ideal-gas compressible Navier–Stokes solvers** using cell-centered SIMPLE pressure–velocity coupling and a **linear acoustic solver** using the node-centered dual-control-volume formulation of `textbook/Chap5-4-acoustic.md`. The mesh, discretization, linear-algebra, and output components are shared foundations for further physics modules.
 
-The project is intended for both numerical-method development and teaching. It emphasizes conservative face fluxes, explicit mesh connectivity, readable operator implementations, and reproducible benchmark cases.
+The primary purpose of this solver is to support **course teaching for computational multiphysics**. It is also intended for numerical-method development. It emphasizes conservative face fluxes, explicit mesh connectivity, readable operator implementations, and reproducible benchmark cases.
 
-> **Current scope:** serial two-dimensional incompressible/Boussinesq flow, single-component laminar ideal-gas compressible flow, passive inert multispecies transport, and linear acoustics are implemented as separate physics modules, with one-way Curle-type flow-to-acoustic source coupling for the cylinder aeolian-tone case. Flow and species use cell-centered fields; acoustics uses nodal fields on median-dual control areas. Composition-driven variable-density flow, reactions, real-gas models, compressible turbulence, shock capturing, elasticity, two-way fluid–structure/acoustic coupling, non-uniform acoustic media, MPI-distributed calculations, and the VOF/DPM/Euler–Euler solve routines remain future work.
+**Copyright:** © Wanai Li, Sino-French Institute of Nuclear Engineering and Technology, Sun Yat-Sen University. All rights reserved.
+
+> **Current scope:** serial two-dimensional incompressible/Boussinesq flow, single-component laminar ideal-gas compressible flow, passive inert multispecies transport, and linear acoustics are implemented as separate physics modules, with one-way Curle-type flow-to-acoustic source coupling for the cylinder aeolian-tone case. Flow and species use cell-centered fields; acoustics uses nodal fields on median-dual control areas. Composition-driven variable-density flow, reactions, real-gas models, compressible turbulence, elasticity, two-way fluid–structure/acoustic coupling, non-uniform acoustic media, MPI-distributed calculations, and the VOF/DPM/Euler–Euler solve routines remain future work.
 
 ## Contents
 
@@ -46,7 +48,7 @@ The reusable code under `src/fvm/` includes:
 - Green–Gauss gradient reconstruction with reconstructed-face corrections.
 - Weighted least-squares gradient reconstruction.
 - Steady, first-order backward-Euler, and constant-step BDF2 time terms. BDF2 uses backward Euler for its first step.
-- Central face reconstruction with an implicit upwind/deferred-correction convection operator.
+- Second-order upwind face reconstruction with an implicit upwind/deferred-correction convection operator and an optional Barth–Jespersen limiter.
 - Over-relaxed orthogonal diffusion with explicit non-orthogonal correction.
 - PETSc sparse-matrix, vector, KSP, and preconditioner wrappers.
 - Tecplot ASCII output for unstructured triangles and quadrilaterals.
@@ -67,11 +69,12 @@ The code under `src/flow/` implements:
 - Automatic pressure-reference fixing when all pressure boundaries are Neumann conditions.
 - Optional steady or transient calculations and a spatially uniform body force.
 - Boussinesq thermal dilation with reference-density transport, hydrostatically modified pressure, integrated buoyancy, and coupled temperature transport.
-- Single-component ideal-gas compressible flow with absolute pressure, cell-variable density, density storage and pressure convection in pressure correction, and static-enthalpy energy with pressure work and viscous dissipation.
+- Single-component ideal-gas compressible flow with absolute pressure, cell-variable density, density storage and pressure convection in pressure correction, and conservative total-enthalpy energy with pressure work, kinetic-energy diffusion correction, and viscous-work fluxes.
+- Pressure-based compressible SIMPLE for subsonic, transonic, and supersonic flow, with upwind pressure convection and consistent extrapolated-outflow density correction.
 - Fixed-temperature, adiabatic/zero-gradient, and inward-positive fixed-heat-flux thermal boundaries, plus uniform volumetric heating.
 - Standard high-Reynolds-number \(k\)-\(\varepsilon\) turbulence with logarithmic-law wall functions.
 - Menter SST-2003 \(k\)-\(\omega\) turbulence with strain-based eddy-viscosity limiting and low-\(y^+\) wall integration.
-- Conservative transport of turbulence variables with bounded implicit upwind convection and optional deferred correction.
+- Conservative transport of turbulence variables with implicit upwind matrices and second-order upwind deferred reconstruction.
 - Turbulence fields, wall shear, friction velocity, and \(y^+\) diagnostics in Tecplot and CSV output.
 
 ### Material models and multispecies transport
@@ -116,7 +119,7 @@ The `viscosity` setting is the **dynamic viscosity** \(\mu\), not the kinematic 
 
 Integrating the momentum equation over control volume \(P\) gives a balance of time accumulation, convection, diffusion, pressure, and body-force terms. Each internal face has a single owner-oriented normal and mass flux, which preserves discrete conservation.
 
-With `flow_model = boussinesq`, density remains at its reference value except for the buoyancy source \(-\rho_0\beta(T-T_0)\mathbf gV_P\), and `p` is hydrostatically modified pressure. With `flow_model = compressible`, `material_model = ideal_gas` evaluates \(\rho=p/(RT)\) from absolute pressure and temperature, and the pressure equation additionally contains density storage and upwind pressure convection. Both thermal models solve temperature from the conservative static-enthalpy equation. The full equations and implementation notes are in `textbook/Chap5-1-SIMPLE-scheme-basic-flow.md`, section 5.7.7.
+With `flow_model = boussinesq`, density remains at its reference value except for the buoyancy source \(-\rho_0\beta(T-T_0)\mathbf gV_P\), and `p` is hydrostatically modified pressure. Boussinesq flow solves the conservative temperature/static-enthalpy equation. With `flow_model = compressible`, the energy unknown is total enthalpy \(H=c_pT+|\mathbf U|^2/2\); temperature is recovered from \(H\) and the latest velocity, and `material_model = ideal_gas` evaluates \(\rho=p/(RT)\) from absolute pressure and recovered temperature. The pressure equation additionally contains density storage and upwind pressure convection. The same pressure-based SIMPLE formulation is used through Mach one and for supersonic flow; extrapolated outflows include the outgoing density correction in both the pressure matrix and mass-flux update. The full equations and implementation notes are in `textbook/Chap5-1-SIMPLE-scheme-basic-flow.md`, sections 5.7.7 and 5.7.8.
 
 ### Gradient reconstruction
 
@@ -125,24 +128,24 @@ Two cell-gradient options are available:
 - `gradient = gauss`: Green–Gauss integration using face-interpolated values, followed by reconstructed-face correction sweeps.
 - `gradient = least_squares`: a weighted least-squares fit to neighbouring cell differences, with Dirichlet boundary constraints where applicable. This is the default.
 
-The same gradient interface is used for scalar fields and both components of vector fields.
+The same gradient interface is used for scalar fields and both components of vector fields. Set `gradient_limiter = barth_jespersen` to limit these gradients for convective reconstruction; the default is `none`. The Barth–Jespersen coefficient is computed independently for every scalar or vector component from the cell and its immediate neighbours. Face-centroid reconstructions are constrained to the local minimum and maximum, and the whole gradient of that component is scaled by one coefficient in `[0,1]`. Pressure correction, Rhie–Chow interpolation, and diffusive gradients remain unlimited.
 
 ### Convection
 
-The implicit matrix uses first-order upwind convection because of its robust diagonal properties. A deferred correction restores the selected higher-order face value during the SIMPLE iterations:
+Convection uses second-order upwind reconstruction by default. For upwind cell \(U\), the face value is
 
 $$
-F_f^{\mathrm{HO}}=F_f^{\mathrm{upwind}}
-+\beta\left(F_f^{\mathrm{central}}-F_f^{\mathrm{upwind}}\right).
+\phi_f^{\mathrm{SOU}}=\phi_U+\alpha_U\mathbf g_U\cdot(\mathbf x_f-\mathbf x_U),
 $$
 
-The `convection_blending` parameter is \(\beta\):
+where \(\alpha_U=1\) without a limiter and is the Barth–Jespersen coefficient when enabled. The implicit matrix retains first-order upwind convection for robust diagonal properties. The deferred correction
 
-- `1.0`: reconstructed central convection; the intended second-order smooth-flow option.
-- `0.0`: first-order upwind convection.
-- Values between zero and one: a blend of the two.
+$$
+F_f^{\mathrm{SOU}}=F_f^{\mathrm{upwind}}
++\dot m_f\left(\phi_f^{\mathrm{SOU}}-\phi_U\right)
+$$
 
-The correction is evaluated with the current outer-iteration field, while the conservative upwind part is assembled into the PETSc matrix. No flux limiter is currently applied.
+is evaluated with the current outer-iteration field. Momentum, energy, turbulence, and species transport all use this operator; there is no central/blended convection option.
 
 ### Diffusion
 
@@ -249,7 +252,7 @@ initial_velocity = 1 0
 initial_k = 1.5e-4
 initial_epsilon = 1.125           # use initial_omega for SST
 turbulence_relaxation = 0.3
-turbulence_convection_blending = 0.0
+gradient_limiter = barth_jespersen
 turbulence_tolerance = 2.0e-6
 maximum_eddy_viscosity_ratio = 1000
 ```
@@ -316,7 +319,7 @@ Turbulence lower bounds default to `minimum_k = 1e-12`, `minimum_epsilon = 1e-12
 │   │   └── VolumeFractionMixture.* Phase-fraction property mixing
 │   ├── flow/
 │   │   ├── BoundaryConditions.* Flow boundary-condition handling
-│   │   ├── EnergyModel.*       Temperature boundaries, energy transport, and pressure work
+│   │   ├── EnergyModel.*       Temperature boundaries, total-enthalpy transport, and pressure/viscous work
 │   │   ├── TurbulenceModel.*   Standard k-epsilon and SST-2003 implementations
 │   │   ├── MultiSpeciesModel.* Species fields, transport, flux closure, and diagnostics
 │   │   ├── multiphase/        VOF, ASM, Euler–Euler, DPM interfaces (not implemented)
@@ -333,12 +336,13 @@ Turbulence lower bounds default to `minimum_k = 1e-12`, `minimum_epsilon = 1e-12
 │   ├── validate_acoustic.py    Analytical acoustic runs, metrics, and SVG plots
 │   ├── generate_multispecies_meshes.py Structured species-verification meshes
 │   ├── validate_multispecies.py Species analytical/property checks and grid refinement
-│   ├── generate_thermal_meshes.py Structured thermal-cavity and nozzle meshes
+│   ├── generate_thermal_meshes.py Structured thermal-cavity, nozzle, and bump meshes
 │   ├── validate_thermal_compressible.py Boussinesq/compressible analytical validation
 │   ├── boussinesq_cavity/      de Vahl Davis natural-convection grids
 │   ├── compressible_conduction/ Zero-flow ideal-gas conduction
 │   ├── compressible_closed_heating/ Transient constant-mass heating
 │   ├── compressible_nozzle/    Subsonic isentropic nozzle grids
+│   ├── compressible_bump/      Subsonic/transonic/supersonic compressible-SIMPLE bump cases
 │   ├── species_stefan_tube/    Binary analytical Stefan diffusion at three resolutions
 │   ├── species_flux_correction/ Unequal-diffusivity analytical flux-closure checks
 │   ├── species_diffusion/      Three-species transient analytical diffusion
@@ -441,6 +445,9 @@ Pass either a case directory or the full path to a `case.in` file:
 ./multiphysics cases/compressible_conduction
 ./multiphysics cases/compressible_closed_heating
 ./multiphysics cases/compressible_nozzle/fine
+./multiphysics cases/compressible_bump/subsonic
+./multiphysics cases/compressible_bump/transonic
+./multiphysics cases/compressible_bump/supersonic
 ./multiphysics cases/acoustic_cavity
 ./multiphysics cases/acoustic_plane_wave
 ./multiphysics cases/acoustic_convected
@@ -461,7 +468,8 @@ Run the solver directly, without `mpirun`; the current implementation intentiona
 | `make validate-turbulence` | Run both models at all plate/elbow resolutions, check conservation and accuracy, and generate comparison data and SVG plots. |
 | `make validate-acoustic` | Run all analytical acoustic cases, check errors/reflection, and generate comparison data and SVG plots. |
 | `make validate-multispecies` | Run ten species/property cases, check analytical errors, grid order, conservation, and generate metrics and SVG plots. |
-| `make validate-thermal` | Run three natural-convection grids, ideal-gas conduction, transient closed heating, and three compressible-nozzle grids. |
+| `make validate-thermal` | Run the thermal and nozzle cases plus subsonic, transonic, and supersonic bump flows. |
+| `make validate-bump` | Run the three compressible-SIMPLE circular-arc bump regimes and reference comparisons. |
 | `make cylinder-aeolian` | Run transient `Re = 150` cylinder flow, construct a Curle dipole from its force history, propagate the sound, and plot the results. |
 | `make clean` | Remove the executable and `build/`. It does not remove case results or `validation/`. |
 
@@ -480,7 +488,7 @@ pressure = zeroGradient
 | Setting | Default | Meaning |
 |---|---:|---|
 | `physics` | `flow` | `flow` for cell-centered SIMPLE or `acoustic` for the nodal acoustic solver. |
-| `flow_model` | `incompressible` | `incompressible`, `boussinesq`, or `compressible` (single-component ideal gas). |
+| `flow_model` | `incompressible` | `incompressible`, `boussinesq`, or `compressible` (pressure-based ideal-gas SIMPLE). |
 | `mesh` | required | Gmsh file, relative to the case directory unless absolute. |
 | `output` | `results/flow.plt` | Tecplot output path. |
 | `time_scheme` | `steady` | Flow: `steady`, `euler`, `backward_euler`, or `bdf2`. See the acoustic section for its schemes. |
@@ -494,14 +502,13 @@ pressure = zeroGradient
 | `initial_epsilon` | `1e-6` | Initial dissipation for `k_epsilon`. |
 | `initial_omega` | `1.0` | Initial specific dissipation for SST. |
 | `turbulence_relaxation` | `0.5` | Under-relaxation for turbulence equations in `(0,1]`. |
-| `turbulence_convection_blending` | `0.0` | Zero for upwind, one for deferred central correction. |
 | `turbulence_tolerance` | value of `tolerance` | Maximum normalized turbulence update. |
 | `turbulence_ksp` | `bcgs` | PETSc KSP type for turbulence transport. |
 | `turbulence_pc` | `ilu` | PETSc preconditioner for turbulence transport. |
 | `maximum_eddy_viscosity_ratio` | `1000` | Numerical \(\mu_t/\mu\) safeguard for standard \(k\)-\(\varepsilon\). |
 | `body_force` | `0 0` | Body force per unit mass, two components. |
 | `gradient` | `least_squares` | `least_squares`/`lsq` or `gauss`/`green_gauss`. |
-| `convection_blending` | `1.0` | Zero for upwind, one for central, or an intermediate blend. |
+| `gradient_limiter` | `none` | `none` or `barth_jespersen` (`barth-jespersen` and `bj` are aliases), applied to convective reconstruction. |
 | `velocity_relaxation` | `0.7` | Momentum under-relaxation in `(0,1]`. |
 | `pressure_relaxation` | `0.3` | Pressure under-relaxation in `(0,1]`. |
 | `maximum_iterations` | `2000` steady, `100` transient | Maximum SIMPLE iterations per steady solve or time step. |
@@ -532,7 +539,6 @@ The outer `tolerance` and `continuity_tolerance` are absolute quantities. They s
 | `heat_source` | `0` | Uniform volumetric heat source in W/m³. |
 | `viscous_dissipation` | `true` compressible, `false` Boussinesq | Include viscous dissipation in energy. |
 | `energy_relaxation` | `0.7` | Energy-equation under-relaxation in `(0,1]`. |
-| `energy_convection_blending` | `convection_blending` | Upwind/deferred-central energy convection blend. |
 | `turbulent_prandtl` | `0.9` | Turbulent Prandtl number for Boussinesq/RANS heat transport. |
 | `energy_tolerance` | `tolerance` | Maximum absolute temperature update in K. |
 | `density_tolerance` | `tolerance` | Maximum absolute density update in kg/m³ for compressible convergence. |
@@ -555,6 +561,9 @@ For compressible flow, `initial_pressure` and every `pressure = fixedValue ...` 
 | `dt` | `0.01` | Time-step size. |
 | `end_time` | `1.0` | Physical end time. |
 | `maximum_steps` | `1000000` | Safety limit on the number of time steps. |
+| `allow_incomplete_time_steps` | `false` | Allow limited-iteration intermediate steps for transient-to-steady calculations. |
+| `final_maximum_iterations` | `maximum_iterations` | Required fully converged iteration budget for the final step. |
+| `restart` | disabled | Optional Tecplot file providing cell-centered `U`, `p`, and `T`, relative to the case directory. |
 | `output_interval` | `10` | Write a Tecplot file every this many steps. |
 | `force_patch` | disabled | Physical patch on which to integrate pressure and viscous force. |
 | `force_output` | `results/forces.csv` | Force-history CSV path when `force_patch` is set. |
@@ -574,7 +583,6 @@ time_scheme = steady
 density = 1.0
 viscosity = 0.01
 gradient = least_squares
-convection_blending = 1.0
 
 velocity_relaxation = 0.7
 pressure_relaxation = 0.3
@@ -651,7 +659,6 @@ For single-component compressible flow, use `flow_model = compressible` and `mat
 | `thermo_pressure` | `101325` | Absolute pressure in Pa for the ideal-gas equation of state. |
 | `initial_mass_fractions` | required | One non-negative value per species, summing to one within `1e-8`. |
 | `species_relaxation` | `0.7` | Species linear-equation under-relaxation in `(0,1]`. |
-| `species_convection_blending` | `0.0` | Zero for upwind, one for deferred central correction. Significant unbounded overshoots are rejected at convergence. |
 | `turbulent_schmidt` | `0.7` | Turbulent Schmidt number; adds `mu_t/Sc_t` to each species diffusion coefficient. |
 | `species_tolerance` | `tolerance` | Maximum absolute mass-fraction update. |
 | `species_composition_tolerance` | `1e-8` | Allowed sum-closure error and bound tolerance at outer convergence. |
@@ -672,7 +679,6 @@ density = 1.1719579191113527
 viscosity = 1.8188965989347983e-5
 initial_mass_fractions = 0.7670824885424203 0.23291751145757966
 species_relaxation = 1.0
-species_convection_blending = 0.0
 turbulent_schmidt = 0.7
 
 [species.N2]
@@ -858,8 +864,10 @@ The default output is ASCII Tecplot. Nodal coordinates and cell-centered fields 
 | `X`, `Y` | Nodes | Mesh coordinates. |
 | `U_x`, `U_y` | Cell centres | Velocity components. |
 | `p` | Cell centres | Static pressure; hydrostatically modified for Boussinesq and absolute for compressible flow. |
-| `T` | Cell centres | Absolute temperature for thermal models. |
+| `T` | Cell centres | Absolute temperature for thermal models; recovered from total enthalpy in compressible flow. |
+| `H0` | Cell centres | Total enthalpy \(c_pT+|\mathbf U|^2/2\) for compressible flow. |
 | `rho` | Cell centres | Reference or equation-of-state density for thermal models. |
+| `Mach` | Cell centres | Local Mach number for compressible models. |
 | `lambda`, `cp` | Cell centres | Molecular conductivity and specific heat for thermal models. |
 | `mass_imbalance` | Cell centres | Signed integrated cell mass imbalance, including transient density accumulation for compressible flow. |
 | `vorticity` | Cell centres | `dv/dx - du/dy`, enabled by `output_vorticity = true`. |
@@ -971,7 +979,11 @@ The finest-grid relative L2 errors are approximately `3.41e-5` for Stefan diffus
 
 ### Boussinesq and compressible-flow validation
 
-`make validate-thermal` runs three de Vahl Davis natural-convection grids (`Ra = 10^4`, `Pr = 0.71`), zero-flow ideal-gas conduction, transient closed-volume heating, and three subsonic isentropic-nozzle grids. The driver checks coupled convergence, mass conservation, analytical temperature/pressure/density profiles, Nusselt number, mid-plane velocity maxima, and grid refinement. The finest cavity gives `Nu = 2.27680` versus `2.243` (`1.507%` error). The finest nozzle has pressure, density, temperature, and velocity relative L2 errors of `0.969%`, `1.003%`, `0.0741%`, and `0.695%`, respectively. See [`validation/thermal_compressible_validation.md`](validation/thermal_compressible_validation.md) for equations, all eight runs, acceptance criteria, source links, and model limitations.
+`make validate-thermal` runs three de Vahl Davis natural-convection grids (`Ra = 10^4`, `Pr = 0.71`), zero-flow ideal-gas conduction, transient closed-volume heating, and three subsonic isentropic-nozzle grids. The driver checks coupled convergence, mass conservation, analytical temperature/pressure/density profiles, Nusselt number, mid-plane velocity maxima, and grid refinement. The finest cavity gives `Nu = 2.27680` versus `2.243` (`1.507%` error). The finest nozzle has pressure, density, temperature, and velocity relative L2 errors of `0.969%`, `1.003%`, `0.0741%`, and `0.695%`, respectively. See [`validation/thermal_compressible_validation.md`](validation/thermal_compressible_validation.md) for equations, all eleven runs, acceptance criteria, source links, and model limitations.
+
+### Bump-flow validation
+
+`make validate-bump` runs the 10% circular-arc bump at inlet Mach `0.5` (subsonic) and `0.675` (transonic), and the 4% bump at Mach `1.4` (supersonic) using the pressure-based compressible SIMPLE solver. All three use `90 x 24` body-fitted quadrilateral grids and second-order upwind convection with `gradient_limiter = barth_jespersen`. The subsonic case checks fore/aft symmetry and isentropic exit Mach number; the transonic case compares exit Mach numbers `0.670` and `0.615` from Favini et al.; the supersonic case checks shock topology and approximate wall Mach profiles. The clean-run results and source links are documented in `validation/thermal_compressible_validation.md` and `cases/compressible_bump/README.md`.
 
 ### Cylinder vortex shedding and aeolian tone
 
@@ -992,7 +1004,7 @@ The finest-grid relative L2 errors are approximately `3.41e-5` for Stefan diffus
 6. Inspect the console convergence, `<case>_summary.csv`, and the Tecplot result.
 7. Check both local cell mass imbalance and global boundary mass conservation before interpreting the flow field.
 
-For difficult cases, first reduce `convection_blending`, lower the SIMPLE relaxation factors, or improve the mesh. Tightening linear-solver tolerances does not by itself guarantee nonlinear SIMPLE convergence.
+For difficult cases, enable `gradient_limiter = barth_jespersen`, lower the SIMPLE relaxation factors, or improve the mesh. Tightening linear-solver tolerances does not by itself guarantee nonlinear SIMPLE convergence.
 
 ## Adding another physics solver
 
@@ -1025,7 +1037,7 @@ public:
 - Serial execution only; there is no domain decomposition or distributed PETSc matrix assembly.
 - Two-dimensional linear triangles and quadrilaterals only.
 - Incompressible/Boussinesq transport uses reference density; ideal-gas compressible flow updates density from pressure and temperature. Passive species and mixture properties do not feed variable properties back into SIMPLE.
-- Compressible flow is limited to single-component laminar ideal gas with constant heat capacity and transport properties; there are no real-gas, temperature-dependent-property, compressible-turbulence, or dedicated shock-capturing models.
+- Compressible flow is limited to single-component laminar ideal gas with constant heat capacity and transport properties; real-gas, temperature-dependent-property, and compressible-turbulence models are unavailable. All compressible cases use pressure-based SIMPLE with second-order upwind convection. The optional Barth–Jespersen limiter controls reconstruction overshoots, but shock thickness and peak values remain grid- and dissipation-dependent.
 - Multispecies transport is inert and isothermal, with constant or mixture-averaged Fick diffusion; no Maxwell–Stefan matrix, Soret/Dufour effects, reactions, or species-energy coupling.
 - VOF, algebraic-slip, Euler–Euler, and DPM modules are interfaces only; no multiphase field or particle solve is implemented.
 - Two-dimensional RANS only: three-dimensional secondary flow, swirl, and cross-sectional Dean vortices cannot be represented.
@@ -1036,7 +1048,7 @@ public:
 - No convection limiter, so central reconstruction can produce oscillations in strongly convection-dominated or poor-quality-mesh cases.
 - No curved/high-order Gmsh element support.
 - No binary Gmsh input or binary Tecplot output.
-- No restart/checkpoint facility.
+- Restart is limited to cell-centered `U`, `p`, and `T` from an existing Tecplot result; no portable checkpoint metadata or parallel restart support.
 - No variable-time-step BDF2 coefficients.
 - Grid-refinement studies are case-specific; there is no complete Navier–Stokes manufactured-solution or temporal-order study yet.
 - The supplied validation meshes are deliberately modest in size and should not be treated as grid-independent production results.
@@ -1069,8 +1081,8 @@ public:
 
 ### Finite-volume numerics
 
-- [ ] Add bounded second-order convection with flux or gradient limiters.
-- [ ] Add additional convection schemes such as second-order upwind and QUICK.
+- [x] Add bounded second-order upwind convection with an optional Barth–Jespersen gradient limiter.
+- [ ] Add additional convection schemes such as QUICK.
 - [ ] Improve robustness of non-orthogonal corrections on highly skewed meshes.
 - [x] Add ideal-gas density and cell-property fields to SIMPLE.
 - [ ] Add temperature-dependent viscosity, conductivity, and heat capacity where appropriate.
@@ -1103,7 +1115,7 @@ public:
 
 ### Usability and productivity
 
-- [ ] Add checkpoint/restart support for steady and transient calculations.
+- [x] Add checkpoint/restart support for steady and transient calculations.
 - [ ] Add optional binary or parallel Tecplot output for large meshes.
 - [ ] Add command-line overrides for frequently changed case parameters.
 - [ ] Add more diagnostic fields such as vorticity, Courant number, forces, and boundary flux reports.
@@ -1155,7 +1167,7 @@ Check that every physical curve name has a matching section such as `[boundary.w
 
 - Check mesh quality and boundary-condition consistency.
 - Reduce `velocity_relaxation` and `pressure_relaxation`.
-- Start with `convection_blending = 0`, then increase it for higher-order accuracy.
+- Enable `gradient_limiter = barth_jespersen` if reconstructed convection produces local overshoots.
 - Confirm that at least one pressure reference exists, either explicitly or through the automatic closed-domain reference.
 - Inspect whether the PETSc KSP itself is diverging; nonlinear relaxation cannot repair an invalid mesh or an inconsistent linear system.
 

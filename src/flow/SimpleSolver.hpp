@@ -67,6 +67,7 @@ public:
 private:
     FlowDiagnostics solveStep(double dt, int maximumIterations);
     void updateBoundaries();
+    void readRestart(const std::filesystem::path& file);
     void updateMaterialProperties();
     double faceDensity(std::size_t faceIndex) const;
     void computeMassFlux(bool rhieChow);
@@ -92,7 +93,7 @@ private:
     double viscosity_;
     double velocityRelaxation_;
     double pressureRelaxation_;
-    double convectionBlending_;
+    bool barthJespersenLimiter_;
     double outerTolerance_;
     double continuityTolerance_;
     double linearRelativeTolerance_;

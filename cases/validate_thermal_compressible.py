@@ -42,8 +42,9 @@ CASES = [
 ]
 
 FIELDS = ("case", "family", "level", "h", "cells", "iterations", "converged", "max_cell_imbalance",
-          "net_boundary_flux", "temperature_change", "density_change", "relative_l2_temperature",
-          "relative_l2_density", "relative_l2_pressure", "relative_l2_velocity", "observed_order",
+          "net_boundary_flux", "temperature_change", "density_change", "total_enthalpy_closure",
+          "relative_l2_total_enthalpy", "relative_l2_temperature", "relative_l2_density",
+          "relative_l2_pressure", "relative_l2_velocity", "observed_order",
           "nusselt", "nusselt_error_percent", "u_max", "u_max_error_percent", "v_max",
           "v_max_error_percent", "max_transverse_velocity", "passed")
 
@@ -126,6 +127,12 @@ def analyze(specification):
                 "density_change": float(summary["density_change"]),
                 "max_transverse_velocity": max(abs(cell["U_y"]) for cell in cells), "passed": 1})
     failures = []
+    if family != "cavity":
+        row["total_enthalpy_closure"] = max(
+            abs(cell["H0"] - (CP * cell["T"] + 0.5 * (cell["U_x"] ** 2 + cell["U_y"] ** 2))) /
+            max(abs(cell["H0"]), 1.0) for cell in cells)
+        if not math.isfinite(row["total_enthalpy_closure"]) or row["total_enthalpy_closure"] > 1e-9:
+            failures.append("total-enthalpy/temperature closure is non-finite or exceeds 1e-9")
     if not row["converged"]:
         failures.append("solver convergence failed")
     if row["max_cell_imbalance"] > 1e-7 or row["net_boundary_flux"] > 1e-7:
@@ -177,10 +184,15 @@ def analyze(specification):
                                     "relative_l2_pressure", "relative_l2_velocity")) > 1e-8:
             failures.append("closed-heating analytical error exceeds 1e-8")
     else:
+        inlet_enthalpy = CP * T_IN + 0.5 * U_IN ** 2
+        row["relative_l2_total_enthalpy"] = relative_l2(
+            cells, "H0", lambda cell: inlet_enthalpy, lambda cell: 0.2 - 0.025 * cell["x"])
         for name, output in (("T", "relative_l2_temperature"), ("rho", "relative_l2_density"),
                              ("p", "relative_l2_pressure"), ("U_x", "relative_l2_velocity")):
             row[output] = relative_l2(cells, name, lambda cell, key=name: nozzle_exact(cell["x"])[key],
                                       lambda cell: 0.2 - 0.025 * cell["x"])
+        if row["relative_l2_total_enthalpy"] > 0.01:
+            failures.append("nozzle total-enthalpy relative L2 error exceeds 1%")
         if row["relative_l2_pressure"] > 0.05 or row["relative_l2_density"] > 0.05:
             failures.append("nozzle pressure/density relative L2 error exceeds 5%")
         if row["relative_l2_temperature"] > 0.01 or row["relative_l2_velocity"] > 0.05:
@@ -232,7 +244,8 @@ def comparisons(rows, cells_by_name):
                                     "p_numerical": cell["p"], "p_exact": exact["p"],
                                     "T_numerical": cell["T"], "T_exact": exact["T"],
                                     "rho_numerical": cell["rho"], "rho_exact": exact["rho"],
-                                    "U_numerical": cell["U_x"], "U_exact": exact["U_x"]})
+                                    "U_numerical": cell["U_x"], "U_exact": exact["U_x"],
+                                    "H0_numerical": cell["H0"], "H0_exact": CP * T_IN + 0.5 * U_IN ** 2})
             write_rows(DATA / f"compressible_{specification['name']}.csv", output_rows)
     cells = cells_by_name["ideal_gas_conduction"]
     write_rows(DATA / "compressible_conduction.csv",

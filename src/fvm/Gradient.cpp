@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cctype>
 #include <cmath>
+#include <limits>
 #include <stdexcept>
 #include <type_traits>
 
@@ -166,7 +167,71 @@ std::vector<Gradient<Value>> leastSquares(const Field<Value>& field) {
     return gradients;
 }
 
+template <typename Value>
+void limitReconstructedGradient(const Field<Value>& field, std::vector<Gradient<Value>>& gradients) {
+    const Mesh& mesh = field.mesh();
+    constexpr int componentCount = std::is_same_v<Value, double> ? 1 : 2;
+    for (std::size_t cellIndex = 0; cellIndex < mesh.cells.size(); ++cellIndex) {
+        const Cell& cell = mesh.cells[cellIndex];
+        for (int componentIndex = 0; componentIndex < componentCount; ++componentIndex) {
+            const auto component = [componentIndex](const Value& value) {
+                if constexpr (std::is_same_v<Value, double>) return value;
+                else return value[componentIndex];
+            };
+            const double centreValue = component(field[cellIndex]);
+            double minimum = centreValue;
+            double maximum = centreValue;
+            for (int faceIndex : cell.faces) {
+                const Face& face = mesh.faces[faceIndex];
+                const double neighbourValue = face.isBoundary()
+                    ? component(field.boundary(faceIndex))
+                    : component(field[face.owner == static_cast<int>(cellIndex) ? face.neighbour : face.owner]);
+                minimum = std::min(minimum, neighbourValue);
+                maximum = std::max(maximum, neighbourValue);
+            }
+
+            double alpha = 1.0;
+            const double tolerance = std::numeric_limits<double>::epsilon() *
+                std::max({1.0, std::abs(centreValue), std::abs(minimum), std::abs(maximum)});
+            for (int faceIndex : cell.faces) {
+                const Vector2 displacement = mesh.faces[faceIndex].centre - cell.centre;
+                const double delta = [&] {
+                    if constexpr (std::is_same_v<Value, double>) return dot(gradients[cellIndex], displacement);
+                    else return dot(gradients[cellIndex][componentIndex], displacement);
+                }();
+                if (delta > tolerance) {
+                    alpha = std::min(alpha, std::max(0.0, (maximum - centreValue) / delta));
+                } else if (delta < -tolerance) {
+                    alpha = std::min(alpha, std::max(0.0, (minimum - centreValue) / delta));
+                }
+            }
+            alpha = std::clamp(alpha, 0.0, 1.0);
+            if constexpr (std::is_same_v<Value, double>) gradients[cellIndex] *= alpha;
+            else gradients[cellIndex][componentIndex] *= alpha;
+        }
+    }
+}
+
 } // namespace
+
+bool useBarthJespersenLimiter(const Config& config) {
+    const std::string limiter = lowercase(config.get("gradient_limiter", "none"));
+    if (limiter == "none" || limiter == "off" || limiter == "false") return false;
+    if (limiter == "barth_jespersen" || limiter == "barth-jespersen" || limiter == "bj") return true;
+    throw std::runtime_error("Unknown gradient limiter: " + limiter);
+}
+
+std::vector<ScalarGradient> applyBarthJespersenLimiter(const ScalarField& field,
+                                                       std::vector<ScalarGradient> gradients) {
+    limitReconstructedGradient(field, gradients);
+    return gradients;
+}
+
+std::vector<VectorGradient> applyBarthJespersenLimiter(const VectorField& field,
+                                                       std::vector<VectorGradient> gradients) {
+    limitReconstructedGradient(field, gradients);
+    return gradients;
+}
 
 std::vector<ScalarGradient> GaussGradient::scalar(const ScalarField& field) const {
     return gauss(field, correctionIterations_);

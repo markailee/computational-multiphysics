@@ -4,6 +4,7 @@
 #include "fvm/ScalarTransport.hpp"
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <sstream>
 #include <stdexcept>
@@ -13,7 +14,6 @@ namespace mp {
 EnergyModel::EnergyModel(const Mesh& mesh, const Config& config, bool compressible)
     : mesh_(mesh), config_(config), compressible_(compressible),
       relaxation_(config.number("energy_relaxation", 0.7)),
-      convectionBlending_(config.number("energy_convection_blending", config.number("convection_blending", 1.0))),
       turbulentPrandtl_(config.number("turbulent_prandtl", 0.9)),
       heatSource_(config.number("heat_source", 0.0)),
       viscousDissipation_(config.boolean("viscous_dissipation", compressible)),
@@ -25,19 +25,18 @@ EnergyModel::EnergyModel(const Mesh& mesh, const Config& config, bool compressib
       previousTemperature_("previousT", mesh, temperature_[0]),
       oldTemperature_("oldT", mesh, temperature_[0]),
       oldOldTemperature_("oldOldT", mesh, temperature_[0]),
-      diffusivity_(mesh.cells.size(), 0.0), source_(mesh.cells.size(), 0.0),
-      destruction_(mesh.cells.size(), 0.0), constrainedCells_(mesh.cells.size(), 0),
-      constrainedValues_(mesh.cells.size(), 0.0), energySystem_(static_cast<int>(mesh.cells.size())) {
+      totalEnthalpy_("H0", mesh), previousEnthalpy_("previousH0", mesh),
+      oldEnthalpy_("oldH0", mesh), oldOldEnthalpy_("oldOldH0", mesh),
+      kineticEnergy_("K", mesh), diffusivity_(mesh.cells.size(), 0.0), source_(mesh.cells.size(), 0.0),
+      additionalFaceFlux_(mesh.faces.size(), 0.0), destruction_(mesh.cells.size(), 0.0),
+      constrainedCells_(mesh.cells.size(), 0), constrainedValues_(mesh.cells.size(), 0.0),
+      energySystem_(static_cast<int>(mesh.cells.size())) {
     if (relaxation_ <= 0.0 || relaxation_ > 1.0) throw std::runtime_error("energy_relaxation must be in (0, 1]");
-    if (convectionBlending_ < 0.0 || convectionBlending_ > 1.0) {
-        throw std::runtime_error("energy_convection_blending must be between zero and one");
-    }
     if (!(turbulentPrandtl_ > 0.0)) throw std::runtime_error("turbulent_prandtl must be positive");
     for (double value : temperature_.values()) {
         if (!(value > 0.0) || !std::isfinite(value)) throw std::runtime_error("initial_temperature must be positive");
     }
     for (const BoundaryPatch& patch : mesh.patches) boundaries_.push_back(readBoundary(patch.name));
-    updateBoundaries();
 }
 
 EnergyBoundaryCondition EnergyModel::readBoundary(const std::string& patch) const {
@@ -64,27 +63,52 @@ EnergyBoundaryCondition EnergyModel::readBoundary(const std::string& patch) cons
     return condition;
 }
 
-void EnergyModel::initialize() {
+void EnergyModel::initialize(const VectorField& velocity, const std::vector<double>& heatCapacity) {
     if (initialized_) return;
+    updateKineticEnergy(velocity);
+    for (std::size_t cell = 0; cell < mesh_.cells.size(); ++cell) {
+        if (!(heatCapacity[cell] > 0.0)) throw std::runtime_error("Energy transport requires positive heat capacity");
+        totalEnthalpy_[cell] = heatCapacity[cell] * temperature_[cell] + kineticEnergy_[cell];
+    }
+    updateBoundaries(velocity, heatCapacity);
     previousTemperature_.values() = temperature_.values();
     oldTemperature_.values() = temperature_.values();
     oldOldTemperature_.values() = temperature_.values();
-    updateBoundaries();
+    previousEnthalpy_.values() = totalEnthalpy_.values();
+    oldEnthalpy_.values() = totalEnthalpy_.values();
+    oldOldEnthalpy_.values() = totalEnthalpy_.values();
     initialized_ = true;
 }
 
-void EnergyModel::updateBoundaries() {
+void EnergyModel::updateKineticEnergy(const VectorField& velocity) {
+    for (std::size_t cell = 0; cell < mesh_.cells.size(); ++cell) {
+        kineticEnergy_[cell] = 0.5 * normSquared(velocity[cell]);
+    }
+    for (std::size_t face = mesh_.internalFaceCount(); face < mesh_.faces.size(); ++face) {
+        kineticEnergy_.boundary(face) = 0.5 * normSquared(velocity.boundary(face));
+        kineticEnergy_.boundaryDirichlet(face) = true;
+    }
+}
+
+void EnergyModel::updateBoundaries(const VectorField& velocity, const std::vector<double>& heatCapacity) {
+    updateKineticEnergy(velocity);
     for (std::size_t face = mesh_.internalFaceCount(); face < mesh_.faces.size(); ++face) {
         const int owner = mesh_.faces[face].owner;
         const EnergyBoundaryCondition& condition = boundaries_[mesh_.faces[face].patch];
-        temperature_.boundaryDirichlet(face) = condition.type == EnergyBoundaryType::FixedValue;
-        temperature_.boundary(face) = condition.type == EnergyBoundaryType::FixedValue
-            ? condition.value : temperature_[owner];
+        const bool fixedTemperature = condition.type == EnergyBoundaryType::FixedValue;
+        temperature_.boundaryDirichlet(face) = fixedTemperature;
+        temperature_.boundary(face) = fixedTemperature ? condition.value : temperature_[owner];
+        if (compressible_) {
+            totalEnthalpy_.boundary(face) = heatCapacity[owner] * temperature_.boundary(face) +
+                kineticEnergy_.boundary(face);
+            totalEnthalpy_.boundaryDirichlet(face) = fixedTemperature;
+        }
     }
 }
 
 void EnergyModel::beginIteration() {
     previousTemperature_.values() = temperature_.values();
+    previousEnthalpy_.values() = totalEnthalpy_.values();
 }
 
 LinearSolveInfo EnergyModel::solve(double dt, bool hasOldOld, const std::vector<double>& massFlux,
@@ -95,12 +119,16 @@ LinearSolveInfo EnergyModel::solve(double dt, bool hasOldOld, const std::vector<
                                    const VectorField& velocity, const ScalarField& pressure,
                                    const ScalarField& oldPressure, const ScalarField& oldOldPressure,
                                    const Vector2& bodyForce) {
-    initialize();
-    updateBoundaries();
-    const auto velocityGradient = gradient.vector(velocity);
-    const auto pressureGradient = compressible_ ? gradient.scalar(pressure) : std::vector<ScalarGradient>{};
+    initialize(velocity, heatCapacity);
+    updateBoundaries(velocity, heatCapacity);
+    const auto velocityGradient = compressible_ && viscousDissipation_
+        ? gradient.vector(velocity) : std::vector<VectorGradient>{};
+    const auto kineticGradient = compressible_
+        ? gradient.scalar(kineticEnergy_) : std::vector<ScalarGradient>{};
     const TimeCoefficients time = timeDerivative_.coefficients(dt, hasOldOld);
     std::fill(source_.begin(), source_.end(), 0.0);
+    std::fill(additionalFaceFlux_.begin(), additionalFaceFlux_.end(), 0.0);
+    std::vector<std::array<Vector2, 2>> viscousStress(mesh_.cells.size());
     for (std::size_t cell = 0; cell < mesh_.cells.size(); ++cell) {
         const double cp = heatCapacity[cell];
         if (!(cp > 0.0) || !(density[cell] > 0.0) || conductivity[cell] < 0.0) {
@@ -110,45 +138,103 @@ LinearSolveInfo EnergyModel::solve(double dt, bool hasOldOld, const std::vector<
         diffusivity_[cell] = conductivity[cell] / cp + eddy / turbulentPrandtl_;
         double energySource = heatSource_;
         if (compressible_) {
-            double pressureRate = time.current * pressure[cell] - time.previous * oldPressure[cell]
+            const double pressureRate = time.current * pressure[cell] - time.previous * oldPressure[cell]
                 - time.previousPrevious * oldOldPressure[cell];
-            pressureRate += dot(velocity[cell], pressureGradient[cell]);
             energySource += pressureRate + density[cell] * dot(bodyForce, velocity[cell]);
             if (viscousDissipation_) {
                 const VectorGradient& derivatives = velocityGradient[cell];
                 const double divergence = derivatives[0].x + derivatives[1].y;
-                const double shear = 0.5 * (derivatives[0].y + derivatives[1].x);
-                const double strainProduct = derivatives[0].x * derivatives[0].x
-                    + derivatives[1].y * derivatives[1].y + 2.0 * shear * shear;
-                energySource += viscosity[cell] * (2.0 * strainProduct - (2.0 / 3.0) * divergence * divergence);
+                const double shear = derivatives[0].y + derivatives[1].x;
+                viscousStress[cell][0] = viscosity[cell] *
+                    Vector2{2.0 * derivatives[0].x - (2.0 / 3.0) * divergence, shear};
+                viscousStress[cell][1] = viscosity[cell] *
+                    Vector2{shear, 2.0 * derivatives[1].y - (2.0 / 3.0) * divergence};
             }
         }
-        source_[cell] = energySource / cp;
+        source_[cell] = compressible_ ? energySource : energySource / cp;
+    }
+    for (std::size_t faceIndex = 0; faceIndex < mesh_.internalFaceCount() && compressible_; ++faceIndex) {
+        const Face& face = mesh_.faces[faceIndex];
+        const int owner = face.owner;
+        const int neighbour = face.neighbour;
+        const double faceDiffusivity = face.ownerWeight * diffusivity_[owner] +
+            (1.0 - face.ownerWeight) * diffusivity_[neighbour];
+        const ScalarGradient faceKineticGradient = face.ownerWeight * kineticGradient[owner] +
+            (1.0 - face.ownerWeight) * kineticGradient[neighbour];
+        double flux = faceDiffusivity * (face.area / face.delta * (kineticEnergy_[neighbour] - kineticEnergy_[owner]) +
+            dot(nonOrthogonalVector(mesh_, faceIndex), faceKineticGradient));
+        if (viscousDissipation_) {
+            std::array<Vector2, 2> faceStress;
+            for (int row = 0; row < 2; ++row) {
+                faceStress[row] = face.ownerWeight * viscousStress[owner][row] +
+                    (1.0 - face.ownerWeight) * viscousStress[neighbour][row];
+            }
+            const Vector2 faceVelocity = interpolate(mesh_, velocity, faceIndex);
+            const Vector2 work{dot(faceStress[0], faceVelocity), dot(faceStress[1], faceVelocity)};
+            flux -= dot(work, faceVector(mesh_, faceIndex));
+        }
+        additionalFaceFlux_[faceIndex] = flux;
     }
     for (std::size_t face = mesh_.internalFaceCount(); face < mesh_.faces.size(); ++face) {
         const EnergyBoundaryCondition& condition = boundaries_[mesh_.faces[face].patch];
-        if (condition.type != EnergyBoundaryType::FixedHeatFlux) continue;
         const int owner = mesh_.faces[face].owner;
-        source_[owner] += condition.value * mesh_.faces[face].area /
-            (heatCapacity[owner] * mesh_.cells[owner].volume);
+        if (condition.type == EnergyBoundaryType::FixedHeatFlux) {
+            source_[owner] += condition.value * mesh_.faces[face].area / mesh_.cells[owner].volume /
+                (compressible_ ? 1.0 : heatCapacity[owner]);
+        }
+        if (!compressible_) continue;
+        if (condition.type == EnergyBoundaryType::FixedValue) {
+            additionalFaceFlux_[face] = diffusivity_[owner] *
+                (mesh_.faces[face].area / mesh_.faces[face].delta *
+                    (kineticEnergy_.boundary(face) - kineticEnergy_[owner]) +
+                 dot(nonOrthogonalVector(mesh_, face), kineticGradient[owner]));
+        }
+        if (viscousDissipation_ && velocity.boundaryDirichlet(face)) {
+            const Vector2 boundaryVelocity = velocity.boundary(face);
+            const Vector2 work{dot(viscousStress[owner][0], boundaryVelocity),
+                dot(viscousStress[owner][1], boundaryVelocity)};
+            additionalFaceFlux_[face] -= dot(work, faceVector(mesh_, face));
+        }
     }
 
-    ScalarTransportEquation equation{temperature_, previousTemperature_, oldTemperature_, oldOldTemperature_,
+    ScalarField& field = compressible_ ? totalEnthalpy_ : temperature_;
+    const ScalarField& previous = compressible_ ? previousEnthalpy_ : previousTemperature_;
+    const ScalarField& old = compressible_ ? oldEnthalpy_ : oldTemperature_;
+    const ScalarField& oldOld = compressible_ ? oldOldEnthalpy_ : oldOldTemperature_;
+    ScalarTransportEquation equation{field, previous, old, oldOld,
         massFlux, diffusivity_, source_, destruction_, constrainedCells_, constrainedValues_, 1.0, time,
-        relaxation_, convectionBlending_, linearRelativeTolerance_, linearAbsoluteTolerance_,
+        compressible_ ? 1.0 : relaxation_, linearRelativeTolerance_, linearAbsoluteTolerance_,
         maximumLinearIterations_, config_.get("energy_ksp", "bcgs"), config_.get("energy_pc", "ilu")};
+    equation.barthJespersen = useBarthJespersenLimiter(config_);
+    equation.secondOrderConvection = config_.boolean("energy_second_order", true);
+    equation.additionalFaceFlux = compressible_ ? &additionalFaceFlux_ : nullptr;
     equation.densityField = &density;
     equation.oldDensityField = &oldDensity;
     equation.oldOldDensityField = &oldOldDensity;
     const LinearSolveInfo info = solveScalarTransport(mesh_, gradient, energySystem_, equation);
-    updateBoundaries();
     change_ = 0.0;
+    temperatureLimited_ = false;
     for (std::size_t cell = 0; cell < mesh_.cells.size(); ++cell) {
+        if (compressible_) {
+            const double recovered = (totalEnthalpy_[cell] - kineticEnergy_[cell]) / heatCapacity[cell];
+            if (!std::isfinite(recovered)) {
+                throw std::runtime_error("Energy equation produced a non-finite temperature");
+            }
+            double relaxed = previousTemperature_[cell] + relaxation_ * (recovered - previousTemperature_[cell]);
+            const double minimumTemperature = std::max(1.0, 0.5 * previousTemperature_[cell]);
+            const double maximumTemperature = 1.5 * previousTemperature_[cell];
+            const double bounded = std::clamp(relaxed, minimumTemperature, maximumTemperature);
+            temperatureLimited_ = temperatureLimited_ || bounded != relaxed;
+            relaxed = bounded;
+            temperature_[cell] = relaxed;
+            totalEnthalpy_[cell] = heatCapacity[cell] * relaxed + kineticEnergy_[cell];
+        }
         if (!(temperature_[cell] > 0.0) || !std::isfinite(temperature_[cell])) {
             throw std::runtime_error("Energy equation produced a non-positive or non-finite temperature");
         }
         change_ = std::max(change_, std::abs(temperature_[cell] - previousTemperature_[cell]));
     }
+    updateBoundaries(velocity, heatCapacity);
     linearIterations_ = info.iterations;
     linearResidual_ = info.residual;
     return info;
@@ -157,6 +243,8 @@ LinearSolveInfo EnergyModel::solve(double dt, bool hasOldOld, const std::vector<
 void EnergyModel::updateTimeHistory() {
     oldOldTemperature_.values() = oldTemperature_.values();
     oldTemperature_.values() = temperature_.values();
+    oldOldEnthalpy_.values() = oldEnthalpy_.values();
+    oldEnthalpy_.values() = totalEnthalpy_.values();
 }
 
 } // namespace mp

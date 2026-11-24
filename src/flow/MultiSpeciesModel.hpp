@@ -58,7 +58,6 @@ private:
     double temperature_;
     double thermodynamicPressure_;
     double relaxation_;
-    double convectionBlending_;
     double turbulentSchmidt_;
     double linearRelativeTolerance_;
     double linearAbsoluteTolerance_;

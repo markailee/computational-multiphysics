@@ -11,7 +11,7 @@ PROJECT_FLAGS := -std=c++17 -O3 -Wall -Wextra -Wpedantic -Isrc -I$(PETSC_DIR)/in
 
 PYTHON ?= python3
 
-.PHONY: all clean meshes validate validate-turbulence validate-acoustic validate-multispecies validate-thermal cylinder-aeolian
+.PHONY: all clean meshes validate validate-turbulence validate-acoustic validate-multispecies validate-thermal validate-bump cylinder-aeolian
 all: $(TARGET)
 
 meshes:
@@ -41,6 +41,10 @@ validate-multispecies: $(TARGET)
 
 validate-thermal: $(TARGET)
 	$(PYTHON) cases/validate_thermal_compressible.py --run
+	$(PYTHON) cases/validate_bump.py --run
+
+validate-bump: $(TARGET)
+	$(PYTHON) cases/validate_bump.py --run
 
 cylinder-aeolian: $(TARGET)
 	$(PYTHON) cases/run_cylinder_aeolian.py --run

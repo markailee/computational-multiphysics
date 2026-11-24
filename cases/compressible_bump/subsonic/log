@@ -1,0 +1,3 @@
+Compressible ideal-gas flow: pressure is absolute
+Mesh: 2160 cells, 4434 faces, 2275 nodes
+SIMPLE      1  dU=5.790936e+01  dp=1.238199e+04  dTurb=0.000000e+00  continuity=5.900223e-10  dTemp=1.370372e+00  drho=1.441541e-01  linear=27

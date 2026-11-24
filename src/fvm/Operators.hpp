@@ -36,20 +36,14 @@ inline Vector2 reconstruct(const Vector2& value, const VectorGradient& gradient,
 }
 
 template <typename Value, typename Gradient>
-Value centralFaceValue(const Mesh& mesh, const Field<Value>& field,
-                       const std::vector<Gradient>& gradients, std::size_t faceIndex) {
+Value secondOrderUpwindFaceValue(const Mesh& mesh, const Field<Value>& field,
+                                 const std::vector<Gradient>& gradients, std::size_t faceIndex,
+                                 double massFlux) {
     const Face& face = mesh.faces[faceIndex];
-    if (face.isBoundary()) {
-        if (field.boundaryDirichlet(faceIndex)) {
-            return field.boundary(faceIndex);
-        }
-        return reconstruct(field[face.owner], gradients[face.owner], face.centre - mesh.cells[face.owner].centre);
-    }
-    const Value ownerValue = reconstruct(field[face.owner], gradients[face.owner],
-                                         face.centre - mesh.cells[face.owner].centre);
-    const Value neighbourValue = reconstruct(field[face.neighbour], gradients[face.neighbour],
-                                             face.centre - mesh.cells[face.neighbour].centre);
-    return face.ownerWeight * ownerValue + (1.0 - face.ownerWeight) * neighbourValue;
+    if (face.isBoundary() && field.boundaryDirichlet(faceIndex)) return field.boundary(faceIndex);
+    const int upwindCell = !face.isBoundary() && massFlux < 0.0 ? face.neighbour : face.owner;
+    return reconstruct(field[upwindCell], gradients[upwindCell],
+                       face.centre - mesh.cells[upwindCell].centre);
 }
 
 struct ConvectionCoefficients {

@@ -30,7 +30,203 @@ $$
 
 右端第一项表示静止介质中的扩散型声学算子，第二项是混合空间—时间导数，第三项对应平均流引起的二阶对流修正。静止介质中 $\mathbf M=0$，方程退化为经典波动方程。
 
-该方程不是任意可压缩流动的替代品。大振幅、强非均匀平均流、显著黏热效应或激波问题需要更完整的控制方程。即使在本章模型范围内，也应明确背景场是否定常、是否满足不可压连续条件，以及 $\rho_0$、$c_0$ 和 $\mathbf M$ 的空间变化如何处理。
+下面从线性化 Euler 方程推导式（5.227）。推导的关键是先消去扰动速度，得到沿平均流物质导数表示的波动方程，再展开二阶物质导数。严格的消元和求导交换针对局部均匀、定常平均流；空间变系数背景的处理见本步末的适用性说明。
+
+**第一步：变量分解与基本假设。** 将瞬时变量分解为平均量与声学扰动量：
+
+$$
+p=p_0+p',\qquad
+\rho=\rho_0+\rho',\qquad
+\mathbf u=\mathbf u_0+\mathbf u'.
+$$
+
+假设流体无黏，忽略黏热耗散和外力；声学扰动等熵，不单独求解熵波；扰动振幅足够小，可忽略二阶及以上扰动项。等熵关系给出
+
+$$
+p'=c_0^2\rho',\qquad
+c_0^2=\left(\frac{\partial p}{\partial\rho}\right)_s.
+$$
+
+定义沿平均流的物质导数算子
+
+$$
+\mathcal D_0=\frac{\partial}{\partial t}
++\mathbf u_0\cdot\nabla,
+\qquad
+\mathcal D_0^2p'=\mathcal D_0(\mathcal D_0p').
+$$
+
+**第二步：线性化连续方程。** 无黏可压缩流的连续方程为
+
+$$
+\frac{\partial\rho}{\partial t}
++\nabla\cdot(\rho\mathbf u)=0.
+$$
+
+代入变量分解，扣除平均场连续方程，并忽略二阶项 $\nabla\cdot(\rho'\mathbf u')$，得到
+
+$$
+\frac{\partial\rho'}{\partial t}
++\nabla\cdot(\rho_0\mathbf u'+\rho'\mathbf u_0)=0.
+$$
+
+对于局部均匀、定常平均流，展开上式可得
+
+$$
+\frac{\partial\rho'}{\partial t}
++\mathbf u_0\cdot\nabla\rho'
++\rho_0\nabla\cdot\mathbf u'=0,
+$$
+
+即
+
+$$
+\mathcal D_0\rho'+\rho_0\nabla\cdot\mathbf u'=0.
+$$
+
+利用 $\rho'=p'/c_0^2$，再除以 $\rho_0$，得到
+
+$$
+\frac1{\rho_0c_0^2}\mathcal D_0p'
++\nabla\cdot\mathbf u'=0.
+$$
+
+**第三步：线性化动量方程。** 忽略黏性力后的动量方程为
+
+$$
+\rho\left(
+\frac{\partial\mathbf u}{\partial t}
++(\mathbf u\cdot\nabla)\mathbf u
+\right)=-\nabla p.
+$$
+
+代入变量分解，扣除平均场方程并忽略二阶扰动项。对于均匀平均流，$\nabla\mathbf u_0=0$，于是
+
+$$
+\rho_0\left(
+\frac{\partial\mathbf u'}{\partial t}
++(\mathbf u_0\cdot\nabla)\mathbf u'
+\right)=-\nabla p',
+$$
+
+即
+
+$$
+\rho_0\mathcal D_0\mathbf u'=-\nabla p',
+\qquad
+\mathcal D_0\mathbf u'=-\frac1{\rho_0}\nabla p'.
+$$
+
+**第四步：消去扰动速度。** 对线性化连续方程的压力形式作用一次 $\mathcal D_0$：
+
+$$
+\frac1{\rho_0c_0^2}\mathcal D_0^2p'
++\mathcal D_0(\nabla\cdot\mathbf u')=0.
+$$
+
+在局部常系数、均匀平均流条件下，物质导数与空间散度可以交换：
+
+$$
+\mathcal D_0(\nabla\cdot\mathbf u')
+=\nabla\cdot(\mathcal D_0\mathbf u').
+$$
+
+代入线性化动量方程，得到
+
+$$
+\frac1{\rho_0c_0^2}\mathcal D_0^2p'
+-\nabla\cdot\left(\frac1{\rho_0}\nabla p'\right)=0,
+$$
+
+即紧凑的对流波动方程
+
+$$
+\frac1{\rho_0c_0^2}\mathcal D_0^2p'
+=\nabla\cdot\left(\frac1{\rho_0}\nabla p'\right).
+$$
+
+**第五步：展开二阶物质导数。** 由 $\mathcal D_0$ 的定义，
+
+$$
+\begin{aligned}
+\mathcal D_0^2p'
+&=\left(\frac{\partial}{\partial t}
++\mathbf u_0\cdot\nabla\right)
+\left(\frac{\partial p'}{\partial t}
++\mathbf u_0\cdot\nabla p'\right)\\
+&=\frac{\partial^2p'}{\partial t^2}
++\frac{\partial}{\partial t}(\mathbf u_0\cdot\nabla p')
++\mathbf u_0\cdot\nabla\left(\frac{\partial p'}{\partial t}\right)
++\mathbf u_0\cdot\nabla(\mathbf u_0\cdot\nabla p').
+\end{aligned}
+$$
+
+因为 $\mathbf u_0$ 定常且局部均匀，第二项与第三项相等，所以
+
+$$
+\mathcal D_0^2p'
+=\frac{\partial^2p'}{\partial t^2}
++2\mathbf u_0\cdot\nabla\left(\frac{\partial p'}{\partial t}\right)
++\mathbf u_0\cdot\nabla(\mathbf u_0\cdot\nabla p').
+$$
+
+因此，平均流同时产生一个混合空间—时间导数项和一个二阶空间导数修正项。
+
+**第六步：用背景马赫数矢量表示。** 利用 $\mathbf u_0=c_0\mathbf M$，并在局部单元内把 $c_0$ 和 $\mathbf M$ 视为常数，有
+
+$$
+\mathbf u_0\cdot\nabla\left(\frac{\partial p'}{\partial t}\right)
+=c_0\frac{\partial}{\partial t}(\mathbf M\cdot\nabla p')
+$$
+
+以及
+
+$$
+\begin{aligned}
+\mathbf u_0\cdot\nabla(\mathbf u_0\cdot\nabla p')
+&=c_0\mathbf M\cdot\nabla
+\left(c_0\mathbf M\cdot\nabla p'\right)\\
+&=c_0^2\mathbf M\cdot\nabla(\mathbf M\cdot\nabla p').
+\end{aligned}
+$$
+
+代回第四步的对流波动方程，得到
+
+$$
+\begin{aligned}
+&\frac1{\rho_0c_0^2}\frac{\partial^2p'}{\partial t^2}
++\frac2{\rho_0c_0}\frac{\partial(\mathbf M\cdot\nabla p')}{\partial t}
++\frac1{\rho_0}\mathbf M\cdot\nabla(\mathbf M\cdot\nabla p')\\
+&\qquad=\nabla\cdot\left(\frac1{\rho_0}\nabla p'\right).
+\end{aligned}
+$$
+
+将混合导数项和二阶对流项移到右端，即得式（5.227）。
+
+**第七步：静止介质与平面波检验。** 当 $\mathbf M=0$ 时，式（5.227）退化为
+
+$$
+\frac1{\rho_0c_0^2}p'_{tt}
+=\nabla\cdot\left(\frac1{\rho_0}\nabla p'\right),
+$$
+
+对均匀介质进一步化为 $p'_{tt}=c_0^2\nabla^2p'$。对于均匀平均流中的平面波
+
+$$
+p'=\widehat p\,e^{\mathrm i(\mathbf k\cdot\mathbf x-\omega t)},
+$$
+
+第四步的对流波动方程给出频散关系
+
+$$
+(\omega-\mathbf u_0\cdot\mathbf k)^2=c_0^2|\mathbf k|^2,
+\qquad
+\omega=\mathbf u_0\cdot\mathbf k\pm c_0|\mathbf k|.
+$$
+
+这表明声波传播由介质中的声速和平均流携带速度共同决定，也验证了混合导数项和二阶对流项的符号。
+
+式（5.227）不是任意可压缩流动的替代品。若平均流非均匀，完整的线性化动量方程还包含 $\rho_0(\mathbf u'\cdot\nabla)\mathbf u_0$ 和 $\rho'(\mathbf u_0\cdot\nabla)\mathbf u_0$，连续方程也包含 $\mathbf u'\cdot\nabla\rho_0$ 和 $\rho'\nabla\cdot\mathbf u_0$；若 $\rho_0$、$c_0$ 和 $\mathbf M$ 随空间变化，交换求导以及展开 $\mathbf u_0=c_0\mathbf M$ 时还会出现额外的系数梯度项。大振幅、强非均匀平均流、显著黏热效应或激波问题因此需要更完整的控制方程。即使在本章模型范围内，也应明确平均场是否定常、是否满足相应的连续方程，以及各项空间变系数在离散中的处理方式。
 
 ### 5.20.2 对流项的张量形式
 

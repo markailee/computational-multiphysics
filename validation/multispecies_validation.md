@@ -13,7 +13,7 @@ All **10 configured runs passed** the automated convergence, analytical-error, g
 
 | Analytical family | Relative L2 error | Last observed grid order |
 |---|---:|---:|
-| Binary Stefan tube | `3.41245e-5` | 2.021 |
+| Binary Stefan tube | `3.42267e-5` | 2.025 |
 | Unequal-diffusivity flux correction | `4.13585e-5` | 1.999 |
 | Three-species transient diffusion | `2.28298e-4` | 2.027 |
 
@@ -135,13 +135,13 @@ Y_A(x)=1-(1-Y_{A,0})e^{Ux/D},
 \qquad Y_B=1-Y_A.
 $$
 
-Equal diffusivities make the correction term zero, isolating the coupled advection–diffusion and boundary treatment. Central deferred convection is used.
+Equal diffusivities make the correction term zero, isolating the coupled advection–diffusion and boundary treatment. Second-order upwind convection is used without a gradient limiter.
 
 | Level | Cells | `h` (m) | Relative L2 | Linf | Observed order |
 |---|---:|---:|---:|---:|---:|
-| Coarse | 40 | 0.005 | `5.70334e-4` | `6.41046e-4` | — |
-| Medium | 80 | 0.0025 | `1.38540e-4` | `1.59722e-4` | 2.042 |
-| Fine | 160 | 0.00125 | `3.41245e-5` | `3.98520e-5` | 2.021 |
+| Coarse | 40 | 0.005 | `5.76292e-4` | `6.40295e-4` | — |
+| Medium | 80 | 0.0025 | `1.39335e-4` | `1.59674e-4` | 2.048 |
+| Fine | 160 | 0.00125 | `3.42267e-5` | `3.98490e-5` | 2.025 |
 
 ![Stefan-tube numerical and analytical profiles](figures/multispecies_stefan_profiles.svg)
 

@@ -1,0 +1,2 @@
+time,iterations,velocity_change,pressure_change,max_cell_imbalance,net_boundary_flux,turbulence_change,turbulence_linear_iterations,species_change,species_composition_error,minimum_mass_fraction,maximum_mass_fraction,species_linear_iterations,temperature_change,density_change,energy_linear_iterations,converged
+0.000000000000e+00,5289,3.068705831329e-06,9.991019364230e-04,1.776356839400e-15,1.154631945610e-14,0.000000000000e+00,0,0.000000000000e+00,0.000000000000e+00,0.000000000000e+00,1.000000000000e+00,0,7.169693958531e-07,9.405539347362e-09,1,1

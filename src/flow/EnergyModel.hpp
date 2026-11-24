@@ -21,9 +21,9 @@ class EnergyModel final {
 public:
     EnergyModel(const Mesh& mesh, const Config& config, bool compressible);
 
-    void initialize();
+    void initialize(const VectorField& velocity, const std::vector<double>& heatCapacity);
     void beginIteration();
-    void updateBoundaries();
+    void updateBoundaries(const VectorField& velocity, const std::vector<double>& heatCapacity);
     LinearSolveInfo solve(double dt, bool hasOldOld, const std::vector<double>& massFlux,
                           const GradientScheme& gradient, const std::vector<double>& density,
                           const std::vector<double>& oldDensity, const std::vector<double>& oldOldDensity,
@@ -34,19 +34,22 @@ public:
                           const Vector2& bodyForce);
     void updateTimeHistory();
 
+    ScalarField& temperature() { return temperature_; }
     const ScalarField& temperature() const { return temperature_; }
+    const ScalarField& totalEnthalpy() const { return totalEnthalpy_; }
     double change() const { return change_; }
+    bool temperatureLimited() const { return temperatureLimited_; }
     int linearIterations() const { return linearIterations_; }
     double linearResidual() const { return linearResidual_; }
 
 private:
     EnergyBoundaryCondition readBoundary(const std::string& patch) const;
+    void updateKineticEnergy(const VectorField& velocity);
 
     const Mesh& mesh_;
     const Config& config_;
     bool compressible_ = false;
     double relaxation_;
-    double convectionBlending_;
     double turbulentPrandtl_;
     double heatSource_;
     bool viscousDissipation_;
@@ -59,9 +62,15 @@ private:
     ScalarField previousTemperature_;
     ScalarField oldTemperature_;
     ScalarField oldOldTemperature_;
+    ScalarField totalEnthalpy_;
+    ScalarField previousEnthalpy_;
+    ScalarField oldEnthalpy_;
+    ScalarField oldOldEnthalpy_;
+    ScalarField kineticEnergy_;
     std::vector<EnergyBoundaryCondition> boundaries_;
     std::vector<double> diffusivity_;
     std::vector<double> source_;
+    std::vector<double> additionalFaceFlux_;
     std::vector<double> destruction_;
     std::vector<char> constrainedCells_;
     std::vector<double> constrainedValues_;
@@ -71,6 +80,7 @@ private:
     int linearIterations_ = 0;
     double linearResidual_ = 0.0;
     bool initialized_ = false;
+    bool temperatureLimited_ = false;
 };
 
 } // namespace mp

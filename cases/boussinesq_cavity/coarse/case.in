@@ -14,8 +14,6 @@ initial_temperature = 300.5
 gravity = 0 -7100000
 
 gradient = least_squares
-convection_blending = 0.0
-energy_convection_blending = 0.0
 velocity_relaxation = 0.3
 pressure_relaxation = 0.2
 energy_relaxation = 0.5

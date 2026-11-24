@@ -1013,7 +1013,13 @@ $$
 
 ### 5.7.5 真实密度模型的压力耦合方程
 
-真实密度模型直接采用 $\rho=\rho(p,T)$。令
+真实密度模型直接采用状态方程 $\rho=\rho(p,T)$，不再假设密度只随温度变化，也不把密度变化限制在浮力项中。此时连续性方程同时包含速度散度和密度变化，压力修正方程必须同时反映**速度修正**和**密度修正**。若仍沿用不可压缩的 Poisson 压力方程，压力只能通过速度散度间接响应质量不平衡，无法描述压力变化引起的密度存储、压力随流动的对流输运以及超声速区的上游依赖。
+
+下面从离散连续性方程出发，给出压力耦合方程的完整线性化推导。这里的“真实密度”指密度由状态方程计算，状态方程可以是理想气体，也可以是其他 $\rho(p,T)$ 关系；推导只要求 $\rho$ 对 $p$、$T$ 可微。式中的 $p$ 是绝对压力，状态方程和 $\Psi$ 均按绝对压力计算。对多组分混合物，密度还依赖组分质量分数，需在 $\rho'$ 中增加相应项；本节先讨论单组分情形。
+
+#### 状态方程与密度修正的线性化
+
+设当前线性化点为 $p^*$、$T^*$，对应密度为 $\rho^*=\rho(p^*,T^*)$。注意 $\rho^*$ 是本次压力求解前由状态方程算出的密度，不是旧时间层的 $\rho^n$；后者只出现在时间导数中。定义修正量
 
 $$
 \rho^{n+1}=\rho^*+\rho',
@@ -1024,7 +1030,34 @@ p^{n+1}=p^*+p'.
 \tag{5.89}
 $$
 
-在固定温度下线性化状态方程：
+其中 $T'=T^{n+1}-T^*$ 为温度修正。将状态方程在 $(p^*,T^*)$ 处作一阶 Taylor 展开：
+
+$$
+\rho^{n+1}
+=\rho^*+\left(\frac{\partial\rho}{\partial p}\right)_Tp'
++\left(\frac{\partial\rho}{\partial T}\right)_pT'
++O\bigl((p')^2,(T')^2,p'T'\bigr).
+$$
+
+记
+
+$$
+\Psi=\left(\frac{\partial\rho}{\partial p}\right)_T,
+\qquad
+\chi=\left(\frac{\partial\rho}{\partial T}\right)_p.
+$$
+
+对理想气体 $\rho=p/(RT)$，有
+
+$$
+\Psi=\frac1{RT}=\frac{\rho^*}{p^*},
+\qquad
+\chi=-\frac{p}{RT^2}=-\frac{\rho^*}{T^*}.
+$$
+
+对 Boussinesq 近似 $\rho=\rho_0[1-\beta(T-T_0)]$，有 $\Psi=0$、$\chi=-\rho_0\beta$。因此 $\Psi=1/c_T^2$，其中 $c_T=\sqrt{(\partial p/\partial\rho)_T}$ 为等温声速；$\Psi$ 越大，压力变化对密度的推动越强。
+
+压力修正方程在固定温度下组装，即只保留压力引起的密度增量：
 
 $$
 \rho'\approx\left(\frac{\partial\rho}{\partial p}\right)_Tp'
@@ -1034,7 +1067,29 @@ $$
 \tag{5.90}
 $$
 
-理想气体等温线性化给出 $\Psi=1/(RT)$。界面质量流量线性化为
+因此 $\rho'$ 不是独立未知量，而由 $p'$ 代数确定；压力方程仍是关于单一未知量 $p'$ 的标量方程，密度修正通过 $\Psi$ 进入其存储项和对流项。所得压力方程对 $p'$ 是线性的，非线性只体现在 $\rho^*$、$\Psi$、$Q_f^*$ 等系数中，通过外迭代更新。
+
+温度修正 $\chi T'$ 的处理是真实密度模型与不可压缩模型的重要区别。能量方程通常在压力修正之后求解，因此 $T'$ 在本次压力求解中未知。可将 $\chi T'$ 作为延迟源项，或用上一外迭代的 $T'$ 估计；更常见的做法是压力修正只使用 $\Psi p'$，压力更新后由完整状态方程重算密度，能量方程更新温度后再次重算密度。外迭代收敛时 $p'\to0$、$T'\to0$，线性化与完整状态方程趋于一致。若温度变化对密度影响很强，延迟处理会减慢收敛，此时应增加外迭代次数，或对温度、密度实施亚松弛。把 $\chi T'$ 同时放入压力方程会形成压力—温度交叉耦合的非对称块系统，分离式求解通常避免这样做。
+
+#### 界面质量流量与速度修正
+
+对界面 $f$，定义体积流量和质量流量
+
+$$
+Q_f=\mathbf U_f\cdot\mathbf A_f,
+\qquad
+\dot m_f=\rho_fQ_f,
+$$
+
+其中 $\mathbf A_f$ 取为从所属单元 $P$ 指向相邻单元 $N$ 的外法向面积矢量。将 $n+1$ 时刻的质量流量在 $*$ 状态展开：
+
+$$
+\dot m_f^{n+1}
+=(\rho_f^*+\rho_f')(Q_f^*+Q_f')
+=\dot m_f^*+\rho_f^*Q_f'+Q_f^*\rho_f'+\rho_f'Q_f'.
+$$
+
+这里假定 $\dot m_f^*=\rho_f^*Q_f^*$，即界面质量流量与界面密度、体积流量使用同一套插值；否则线性化会引入额外的不一致误差。略去二阶小量 $\rho_f'Q_f'$，得到
 
 $$
 \dot m_f^{n+1}
@@ -1046,52 +1101,185 @@ Q_f=\mathbf U_f\cdot\mathbf A_f,
 \tag{5.91}
 $$
 
-速度修正产生压力扩散项，密度修正产生压力存储项和压力对流项。令 $Q_f'=-C_f(\nabla p')_f\cdot\mathbf A_f$，则压力耦合方程可概括为
+固定温度时 $\rho_f'=\Psi_fp_f'$。界面密度和 $\Psi_f$ 的插值必须与质量通量格式一致。压力对流项 $Q_f^*\Psi_fp_f'$ 通常按迎风取值：$Q_f^*>0$ 时取 $\Psi_f=\Psi_P$、$p_f'=p_P'$，$Q_f^*<0$ 时取 $N$ 侧值。这样既改善压力修正方程的对角占优，也使超声速区的压力修正保持上游依赖。密度 $\rho_f^*$ 可用迎风或中心插值，但质量、动量和能量方程必须使用同一个界面质量流量，否则各方程的守恒性会被破坏。
+
+速度修正仍来自动量方程的线性化。与不可压缩情形一样，这里采用 SIMPLE 近似，忽略邻点速度修正，因此 $D_f$ 只由当地动量对角系数和 Rhie–Chow 插值确定。与式（5.11）、（5.24）一致，界面体积流量的修正可写为
 
 $$
-\frac{\Psi V_P}{\Delta t}p_P'
+Q_f'=-D_f(\nabla p')_f\cdot\mathbf A_f,
+$$
+
+其中 $D_f$ 是界面动量插值给出的体积流量修正系数，具有 $\mathrm{m^3\,s\,kg^{-1}}$ 的量纲。在正交网格上
+
+$$
+Q_f'=-D_fA_f\frac{p_N'-p_P'}{\delta_f},
+\qquad
+\delta_f=\lVert\mathbf x_N-\mathbf x_P\rVert.
+$$
+
+定义质量流量修正系数
+
+$$
+C_f=\frac{\rho_f^*D_fA_f}{\delta_f},
+$$
+
+则
+
+$$
+\rho_f^*Q_f'=-C_f(p_N'-p_P').
+$$
+
+这里 $C_f$ 具有 $\mathrm{kg\,s^{-1}\,Pa^{-1}}$ 的量纲，与式（5.99）中使用的系数完全相同。采用 SIMPLEC 时，$D_f$ 应换为修正后的动量对角系数；在非正交网格上，法向两点项隐式处理，非正交修正可延迟到外迭代。
+
+#### 压力耦合方程的推导
+
+式（5.75）已从速度散度角度说明密度变化对连续性的影响；实际离散采用守恒型质量通量，以便直接保证离散质量守恒，并避免把密度变化拆成非守恒源项带来的误差。为简洁，下面写出一阶隐式时间离散；BDF2 等高阶格式只需把时间导数换成相应的离散形式，压力存储项系数随之改变。对单元 $P$ 写出 $n+1$ 时刻的离散连续性方程：
+
+$$
+\frac{\rho_P^{n+1}-\rho_P^n}{\Delta t}V_P
++\sum_{f\in\mathcal F_P}\dot m_f^{n+1}=0.
+$$
+
+将 $\rho^{n+1}=\rho^*+\Psi p'$ 和式（5.91）代入，得
+
+$$
+\frac{\Psi_PV_P}{\Delta t}p_P'
++\sum_{f\in\mathcal F_P}\left[\rho_f^*Q_f'+Q_f^*\Psi_fp_f'\right]
+=-\frac{\rho^*-\rho^n}{\Delta t}V_P
+-\sum_{f\in\mathcal F_P}\dot m_f^*.
+$$
+
+再代入 $Q_f'=-D_f(\nabla p')_f\cdot\mathbf A_f$，即得
+
+$$
+\frac{\Psi_PV_P}{\Delta t}p_P'
 +\sum_{f\in\mathcal F_P}
 \left[Q_f^*\Psi_fp_f'
--\rho_f^*C_f(\nabla p')_f\cdot\mathbf A_f\right]
+-\rho_f^*D_f(\nabla p')_f\cdot\mathbf A_f\right]
 =-\frac{\rho^*-\rho^n}{\Delta t}V_P
 -\sum_{f\in\mathcal F_P}\dot m_f^*.
 \tag{5.92}
 $$
 
-$p_f'$ 可按迎风或其他相容格式插值。与不可压缩压力修正方程相比，式（5.92）额外包含：
+式（5.92）左端三项依次对应密度存储、压力对流和压力扩散；右端是试探场的负质量残差，其中 $\rho^*-\rho^n$ 表示从旧时间层到当前线性化点的密度变化。$p_f'$ 可按迎风或其他相容格式插值。与不可压缩压力修正方程相比，式（5.92）额外包含：
 
-- $\Psi V_P/\Delta t$ 对应的**可压缩存储项**；
+- $\Psi_PV_P/\Delta t$ 对应的**可压缩存储项**；
 - $Q_f^*\Psi_fp_f'$ 对应的**压力对流项**。
 
-因此它不再是纯 Poisson 型方程，而是具有压力对流—扩散及存储结构的耦合方程。温度变化时，完整的密度增量还应包含 $(\partial\rho/\partial T)_pT'$；该项可在能量—压力外迭代中延迟处理。
+因此它不再是纯 Poisson 型方程，而是具有压力对流—扩散及存储结构的耦合方程。
+
+在正交网格上，利用 $(\nabla p')_f\cdot\mathbf A_f\approx A_f(p_N'-p_P')/\delta_f$，式（5.92）化为
+
+$$
+\frac{\Psi_PV_P}{\Delta t}p_P'
++\sum_{f\in\mathcal F_P}
+\left[Q_f^*\Psi_fp_f'+C_f(p_P'-p_N')\right]
+=-\frac{\rho^*-\rho^n}{\Delta t}V_P
+-\sum_{f\in\mathcal F_P}\dot m_f^*.
+$$
+
+这正是5.7.7节实际组装的系数形式。整理成标准代数方程
+
+$$
+a_Pp_P'=\sum_{N(P)}a_Np_N'+b_P,
+$$
+
+其中对每个内部面
+
+$$
+a_N=C_f+\max(-Q_f^*,0)\Psi_f,
+\qquad
+a_P=\frac{\Psi_PV_P}{\Delta t}
++\sum_{f\in\mathcal F_P}\left[C_f+\max(Q_f^*,0)\Psi_f\right],
+$$
+
+$$
+b_P=-\frac{\rho^*-\rho^n}{\Delta t}V_P
+-\sum_{f\in\mathcal F_P}\dot m_f^*.
+$$
+
+上述系数均用当前 $*$ 场计算，并在每次外迭代重新组装；求得 $p'$ 后按 $p^*\leftarrow p^*+\alpha_pp'$ 更新压力，进入下一次线性化。
+
+对固定压力边界取 $p_b'=0$，边界面对 $a_P$ 贡献 $C_f+\max(Q_f^*,0)\Psi_f$；对给定质量流量的边界，$\dot m_b'=0$，该面不进入压力修正方程的系数，但 $\dot m_b^*$ 仍保留在质量残差中。壁面质量流量为零。速度和压力均为零梯度的出流边界需额外计入密度修正，见式（5.100）。
+
+从式（5.92）可以清楚看出各系数的来源。$\Psi_PV_P/\Delta t$ 是压力变化引起的质量存储：$\Psi$ 越大，压力变化对密度的推动越强，压力方程的对角占优越明显；不可压缩极限 $\Psi\to0$ 时该项消失。$Q_f^*\Psi_f$ 是平均流动对压力修正的输运：它使压力方程具有对流性质，在超声速区尤其不能忽略，必须按上游方向离散。$C_f$ 来自速度修正，与不可压缩压力修正方程中的 $\rho dA$ 完全对应；它提供压力修正的椭圆扩散，使局部压力变化能够调整周围速度以满足连续性。
+
+#### 极限情形与求解一致性
+
+**不可压缩极限。** 当 $\rho=\rho_0$、$\Psi=0$ 时，式（5.92）退化为
+
+$$
+\sum_{f\in\mathcal F_P}C_f(p_P'-p_N')
+=-\sum_{f\in\mathcal F_P}\dot m_f^*,
+\qquad
+C_f=\frac{\rho_0D_fA_f}{\delta_f},
+$$
+
+即5.2节的标准压力修正方程（5.14）。这说明式（5.92）是不可压缩压力修正方程在变密度、可压缩条件下的自然推广。
+
+**Boussinesq 近似。** Boussinesq 模型取 $\Psi=0$、$\chi=-\rho_0\beta$，密度变化只保留在浮力项中，连续性方程仍为 $\nabla\cdot\mathbf U=0$。因此压力修正方程仍是式（5.14）的 Poisson 型方程，不需要存储项和压力对流项；温度通过浮力源项影响动量，而不直接进入连续性约束。
+
+**低马赫数与热力学压力。** 在5.7.4节的压力分解下，式（5.92）中的 $p'$ 是机械压力修正，$\Psi$ 应在热力学压力 $P_{th}$ 处取值。若 $P_{th}$ 空间均匀且不随时间变化，它只影响 $\rho^*$ 和 $\Psi$ 的数值；若 $P_{th}$ 随时间变化，还应在连续性方程中加入 $(\partial\rho/\partial P_{th})_T\,\mathrm DP_{th}/\mathrm Dt$ 的贡献，作为压力方程的附加源项。
+
+**理想气体与真实气体。** 理想气体给出 $\Psi=\rho/p=1/(RT)$，式（5.92）中的压力对流项与 $Q_f^*\rho_f^*/p_f^*$ 成正比；马赫数越高，压力对流越重要。对一般真实气体，$\Psi$ 由状态方程给出，可能随压力和温度强烈变化，此时应使用最新的 $p^*$、$T^*$ 计算 $\Psi$，并通过外迭代或牛顿线性化更新。式（5.92）本身不要求理想气体假设。
+
+**温度耦合与更新次序。** 完整密度修正为 $\rho'=\Psi p'+\chi T'$。压力修正只使用 $\Psi p'$，温度项在能量方程更新后通过完整状态方程体现。每次压力修正后，应以 $p\leftarrow p+\alpha_pp'$ 更新压力，并由 $\rho=\rho(p,T)$ 重算密度；随后用同一压力修正更新界面质量流量，内部面按 $\dot m_f\leftarrow\dot m_f^*+C_f(p_P'-p_N')+Q_f^*\Psi_fp_f'$ 修正，与式（5.99）一致。只更新压力而不更新密度，或让能量、组分方程使用未修正的质量流量，都会破坏质量和能量守恒。外迭代收敛时 $p'\to0$、$T'\to0$，线性化质量流量与 $\dot m=\rho Q$ 一致，离散连续性和状态方程同时满足。若对密度单独亚松弛，应保证用于下一次组装的密度与质量流量来自同一压力场，否则收敛过程会出现质量残差的伪振荡。
+
+**矩阵性质与时间步。** 压力对流项采用迎风离散后，式（5.92）一般是非对称矩阵；不可压缩极限下对流项消失，矩阵退化为对称的 Poisson 型矩阵。因此可压缩压力方程通常采用 BiCGStab、GMRES 等非对称 Krylov 方法和 ILU 预处理，而不可压缩方程可使用 CG 和 ICC。非定常可压缩流动的存储项使压力方程在全 Neumann 边界下仍可能非奇异；稳态且无压力边界、无净通量时，压力水平仍可能不确定，需要压力参考或全局质量约束。压力方程隐式求解，不受显式密度基格式的声学 CFL 稳定性限制；但若要准确解析声波或强压缩波，时间步仍需分辨相应的时间尺度。稳态问题通过伪时间外迭代推进，此时存储项消失，压力对流项仍然保留，不能把式（5.92）退化为不可压缩 Poisson 方程。
+
+总之，真实密度压力耦合方程的核心是把连续性方程中的密度变化同时线性化为速度修正和压力修正两部分：速度修正给出压力扩散，压力修正给出可压缩存储和压力对流。5.7.7节将给出该方程在程序中的具体系数、边界处理和更新次序。
 
 ### 5.7.6 可压缩能量方程与求解框架
 
-可压缩流动必须求解能量方程。以理想气体、常 $c_p$ 等简化条件为例，焓形式可写成物质导数形式
+可压缩流动必须求解能量方程，但求解变量应随流动模型选择。等温不可压缩流动不需要能量方程；Boussinesq 和自然对流等低马赫模型可求解温度或静焓；具有显著动能变化、强压缩波或激波的可压缩流动则宜直接求解**守恒形式的总能或总焓**。这样可把动能与热能的交换留在同一守恒变量中，避免把温度方程中的压力功和黏性功误当作可任意省略的小源项。
+
+总比焓定义为 $H=h+K$，其中 $K=\tfrac12|\mathbf U|^2$，$h=e+p/\rho$ 为静比焓。由总能量方程和动量方程可得
 
 $$
-\rho c_p\frac{\mathrm DT}{\mathrm Dt}
-=\frac{\mathrm Dp}{\mathrm Dt}
+\frac{\partial\rho H}{\partial t}
++\nabla\cdot(\rho\mathbf U H)
+=\frac{\partial p}{\partial t}
 +\nabla\cdot(k_f\nabla T)
-+\Phi+\rho\mathbf f\cdot\mathbf U+S_q,
++\nabla\cdot(\boldsymbol\tau\cdot\mathbf U)
++\rho\mathbf f\cdot\mathbf U+S_q .
 \tag{5.93}
 $$
 
-其中 $\Phi$ 为黏性耗散。不同总能、总焓和温度形式的压力功及黏性项应保持等价。温度更新后，通过状态方程重新计算密度，并更新黏度、导热系数等热物性。
+总焓方程只含压力的局部时间导数，不再含静焓方程中的 $\mathbf U\cdot\nabla p$；黏性作用则保留为功通量 $\boldsymbol\tau\cdot\mathbf U$，而不只是耗散 $\Phi=\boldsymbol\tau:\nabla\mathbf U$。二者满足 $\nabla\cdot(\boldsymbol\tau\cdot\mathbf U)=\mathbf U\cdot(\nabla\cdot\boldsymbol\tau)+\Phi$，因此把 $\Phi$ 单独加入总焓方程会漏掉黏性应力对宏观动能的再分配。
+
+有限体积离散时，总焓对流使用与连续性、动量相同的压力修正后质量流量 $\dot m_f$，内部面只构造一个通量并以相反符号加入相邻单元。黏性功也按同一内部面通量组装。这样的通量结构是保持整体能量平衡和表示间断跳跃关系的基础，但激波位置和厚度仍取决于完整方程组、空间格式、限制器与网格；不能仅凭选用总焓变量就宣称自动获得准确的 Rankine–Hugoniot 解。
+
+对单组分常 $c_p$ 理想气体，$h=c_pT$（允许相差任意统一参考常数），恢复温度为
+
+$$
+T=\frac{H-K}{c_p},\qquad \rho=\frac{p}{RT}.
+$$
+
+若 $c_p=c_p(T)$ 或存在多组分，则应由 $H-K=\sum_kY_kh_k(T)$ 反算温度，并用混合物定压热容作牛顿迭代或采用等价的分段求逆；$h_k$ 的参考焓和生成焓必须与组分方程及反应模型一致。包含生成焓时，反应热已经体现在混合焓中，不能再重复添加一个反应热源。
+
+直接以 $H$ 为线性未知量时，热传导还不能简单写成 $k_f\nabla H/c_p$。对常 $c_p$，应使用
+
+$$
+k_f\nabla T=\frac{k_f}{c_p}\nabla H-\frac{k_f}{c_p}\nabla K,
+$$
+
+其中动能扩散修正可在外迭代中延迟处理，黏性功通量同样使用当前速度和应力显式组装；外迭代收敛后，这些延迟项趋于一致。温度恢复后必须检查 $T>0$，再更新密度和温度相关物性。亚松弛作用于 $H$ 时，温度更新量仍可作为收敛判据之一。
+
+边界条件也必须从静温与速度一致地转换。定温进口或壁面给定 $H_b=h(T_b)+\tfrac12|\mathbf U_b|^2$；绝热边界要求 $\partial T/\partial n=0$，在非零边界动能梯度下并不等价于 $\partial H/\partial n=0$。无滑移绝热壁面的黏性功通量为零，但近壁单元仍可能存在动能扩散修正。零梯度出流可取 $H_b=H_P$；有回流时，回流总焓必须与假定的回流静温和速度一致。
 
 一种真实密度、压力基 SIMPLE 的时间步流程为：
 
-1. 给定 $\mathbf U^n$、$\dot m_f^n$、$\rho^n$、$p^n$、$T^n$ 及当前外迭代初值。
+1. 给定 $\mathbf U^n$、$\dot m_f^n$、$\rho^n$、$p^n$、$H^n$，并由 $H^n$ 和速度恢复 $T^n$。
 2. 组装并求解动量方程，得到 $\mathbf U^*$。
 3. 由状态方程计算 $\rho^*$，通过 Rhie–Chow 插值形成 $\dot m_f^*$。
 4. 组装并求解含可压缩存储和压力对流项的 $p'$ 方程。
 5. 修正速度、界面质量流量、密度和压力。
-6. 求解能量方程，更新温度、密度和热物性。
-7. 求解湍流或其他标量输运方程。
-8. 检查所有残差和守恒平衡；未收敛则继续本时间步外迭代。
-9. 收敛后更新旧时间层并推进 $t\leftarrow t+\Delta t$。
+6. 用同一套 $\dot m_f$ 求解总焓方程，由最新 $H$ 和 $\mathbf U$ 恢复温度，再更新密度与热物性。
+7. 求解组分、湍流或其他标量输运方程；多组分能量方程还须包含组分扩散携带的焓，并统一焓参考。
+8. 检查所有场的更新量、离散连续性、状态方程一致性以及局部和全局能量平衡；未收敛则继续本时间步外迭代。
+9. 收敛后更新 $\mathbf U$、$p$、$\rho$、$H$ 等旧时间层并推进 $t\leftarrow t+\Delta t$。
 
-压力、温度、密度和界面流量必须采用相容的更新次序。只更新压力而忘记密度，或使用未修正的界面质量流量，都可能破坏能量与质量守恒。
+因此，本程序的可压缩路径以 $\mathbf U$、$p$、$H$ 为主要求解变量，$T$ 是热力学恢复量；Boussinesq 路径仍以求解 $T$ 为宜。压力、总焓、恢复温度、密度和界面流量必须按相容次序更新，不能只替换未知量符号而沿用温度方程的源项。
 
 ### 5.7.7 本程序的 Boussinesq 与理想气体实现
 
@@ -1108,39 +1296,41 @@ $$
 
 重力以外的 `body_force` 同样乘以 $\rho_0V_P$。这里的 $V_P$ 不可省略，否则源项会随网格加密而被人为放大。密度在对流、扩散和时间项中仍取 $\rho_0$，不在状态方程中更新。
 
-两种热模型都复用第4章的守恒标量输运算子。以温度为未知量、$c_p$ 为常数时，实际组装的形式为
+两种热模型都复用第4章的守恒标量输运算子，但采用不同的求解变量。Boussinesq 模型以温度为未知量、$c_p$ 为常数，实际组装
 
 $$
 \frac{\partial\rho T}{\partial t}
 +\nabla\cdot(\rho\mathbf UT)
 =\nabla\cdot\left[\left(\frac{k_f}{c_p}
 +\frac{\mu_t}{Pr_t}\right)\nabla T\right]
-+\frac{S_T}{c_p},
++\frac{S_q}{c_p}.
 \tag{5.95}
 $$
 
-其中 Boussinesq 模型取 $S_T=S_q$；可压缩模型取
+可压缩模型以总比焓 $H=c_pT+K$ 为未知量，实际求解
 
 $$
-S_T=\frac{\partial p}{\partial t}
-+\mathbf U\cdot\nabla p+\Phi
-+\rho\mathbf f\cdot\mathbf U+S_q.
+\frac{\partial\rho H}{\partial t}
++\nabla\cdot(\rho\mathbf UH)
+=\frac{\partial p}{\partial t}
++\nabla\cdot\left[\Gamma_H(\nabla H-\nabla K)\right]
++\nabla\cdot(\boldsymbol\tau\cdot\mathbf U)
++\rho\mathbf f\cdot\mathbf U+S_q,
+\qquad \Gamma_H=\frac{k_f}{c_p}+\frac{\mu_t}{Pr_t},
 \tag{5.96}
 $$
 
-式（5.95）是静焓方程除以常数 $c_p$ 后的守恒形式，与式（5.93）及连续方程一致。黏性耗散按
+其中当前层流可压缩实现取 $\mu_t=0$。$\Gamma_H\nabla H$ 的法向两点部分进入隐式矩阵，$-\Gamma_H\nabla K$ 和黏性功以保守内部面通量延迟到外迭代；因此它们不会退化为只在一个单元内计算的黏性耗散源。黏性应力与可压缩动量方程一致：
 
 $$
-\Phi=2\mu\left[S_{xx}^2+S_{yy}^2+2S_{xy}^2\right]
--\frac23\mu(\nabla\cdot\mathbf U)^2,
-\qquad S_{xy}=\frac12\left(\frac{\partial u}{\partial y}
-+\frac{\partial v}{\partial x}\right)
+\boldsymbol\tau=\mu\left[\nabla\mathbf U+(\nabla\mathbf U)^T\right]
+-\frac23\mu(\nabla\cdot\mathbf U)\mathbf I .
 \tag{5.97}
 $$
 
-计算，可用 `viscous_dissipation` 控制；可压缩模型缺省启用，Boussinesq 模型缺省忽略。可压缩动量方程也同时包含分子转置应力和 $-\tfrac23\mu(\nabla\cdot\mathbf U)\mathbf I$，从而与式（5.97）保持一致。
+`viscous_dissipation` 为兼容原配置而保留，在可压缩总焓路径中控制的是完整的 $\nabla\cdot(\boldsymbol\tau\cdot\mathbf U)$，缺省启用；Boussinesq 路径不使用该功通量。能量求解后立即按 $T=(H-K)/c_p$ 恢复温度并更新密度。Euler/BDF2 时间项分别存储总焓、密度、压力和速度的旧时间层；温度只是恢复量，不再作为可压缩能量矩阵的解向量。
 
-温度边界在每个 `[boundary.NAME]` 中用 `temperature` 指定：`fixedValue T`、`zeroGradient`（或 `adiabatic`），以及 `fixedHeatFlux q`。最后一种的 $q$ 单位为 W/m²，以进入流体为正，对邻近单元增加 $qA_f/c_p$ 的式（5.95）右端积分项。均匀 `heat_source` 的单位为 W/m³。
+温度边界仍在每个 `[boundary.NAME]` 中用 `temperature` 指定：`fixedValue T`、`zeroGradient`（或 `adiabatic`），以及 `fixedHeatFlux q`。可压缩定温边界自动构造 $H_b=c_pT_b+K_b$；零梯度边界施加零法向静温梯度，并相消隐式总焓扩散与动能修正，而不是错误地强加 $H_b=H_P$ 的导热条件。`fixedHeatFlux q` 的 $q$ 单位为 W/m²，以进入流体为正：Boussinesq 方程右端增加 $qA_f/c_p$，可压缩总焓方程右端增加 $qA_f$。均匀 `heat_source` 的单位均为 W/m³。Tecplot 输出中的 `H0` 为单元总比焓，可用于直接检查 $H=c_pT+K$ 和绝热流动的总焓守恒。
 
 #### 可压缩压力修正的具体组装
 
@@ -1173,9 +1363,9 @@ $$
 \tag{5.99}
 $$
 
-未给定压力的边界（包括给定速度进口）在本次 $p'$ 求解中保持其边界质量流量不变，压力和温度更新后再由状态方程重算边界密度；这相当于把该边界的 $Q_f^*\rho_f'$ 延迟到下一次外迭代。这样可避免进口负对角项造成的启动不稳定，同时保留全部内部面密度修正。固定压力边界取 $p_b'=0$。由于式（5.98）一般非对称，可压缩压力方程缺省使用 BiCGStab 和 ILU，而不是不可压缩方程常用的 CG 和 ICC。
+给定速度且未给定压力的边界（如给定速度进口）在本次 $p'$ 求解中保持其边界质量流量不变，压力和温度更新后再由状态方程重算边界密度；这相当于把该边界的 $Q_f^*\rho_f'$ 延迟到下一次外迭代，可避免进口负对角项造成的启动不稳定。速度和压力均为零梯度的出流边界是例外，必须按式（5.100）同时修正出口密度和质量流量。固定压力边界取 $p_b'=0$。由于式（5.98）一般非对称，可压缩压力方程缺省使用 BiCGStab 和 ILU，而不是不可压缩方程常用的 CG 和 ICC。
 
-每次压力修正后，以 $p\leftarrow p+\alpha_pp'$ 更新绝对压力，并立即由 $\rho=p/(RT)$ 更新密度。能量求解后再次更新密度和物性。Euler/BDF2 时间项分别存储当前、旧和次旧密度、温度、压力与速度；因此时间存储项使用对应时间层的密度，而不是把当前密度乘到所有旧值上。外迭代除速度、压力和质量残差外，还检查温度与密度更新量。
+每次压力修正后，以 $p\leftarrow p+\alpha_pp'$ 更新绝对压力，并立即由 $\rho=p/(RT)$ 更新密度。总焓求解后先恢复温度，再次更新密度和物性。Euler/BDF2 时间项分别存储当前、旧和次旧密度、总焓、压力与速度；因此时间存储项使用对应时间层的密度，而不是把当前密度乘到所有旧值上。外迭代除速度、压力和质量残差外，还检查恢复温度与密度更新量。
 
 典型设置为：
 
@@ -1210,9 +1400,41 @@ pressure_ksp = bcgs
 pressure_pc = ilu
 ```
 
-当前可压缩实现限于二维、单组分、常 $c_p$ 理想气体和层流；不包含温度相关输运物性、真实气体状态方程、化学反应、可压缩湍流修正或专用激波捕捉格式。高马赫数、强激波问题需要进一步采用带限制器的守恒通量和相应稳定化方法。Boussinesq 模型则可与原有层流/RANS 框架组合，其湍流热扩散采用 $\mu_t/Pr_t$。
+当前可压缩实现限于二维、单组分、常 $c_p$ 理想气体和层流；不包含温度相关输运物性、真实气体状态方程、化学反应或可压缩湍流修正。高马赫数问题在同一压力基 SIMPLE 框架中用迎风压力对流、相容质量流量修正和出口密度修正求解，见5.7.8节。对流默认采用二阶迎风重构，可用 Barth–Jespersen 限制器抑制间断附近的越界；激波分辨率仍受网格、限制器和耗散参数限制。Boussinesq 模型则可与原有层流/RANS 框架组合，其湍流热扩散采用 $\mu_t/Pr_t$。
 
-验证算例位于 `cases/boussinesq_cavity/`、`cases/compressible_conduction/`、`cases/compressible_closed_heating/` 和 `cases/compressible_nozzle/`。`make validate-thermal` 会执行自然对流基准、理想气体导热、闭口均匀加热和亚声速喷管检查；实测结果见 `validation/thermal_compressible_validation.md`。
+验证算例位于 `cases/boussinesq_cavity/`、`cases/compressible_conduction/`、`cases/compressible_closed_heating/`、`cases/compressible_nozzle/` 和 `cases/compressible_bump/`。`make validate-thermal` 会执行自然对流基准、理想气体导热、闭口均匀加热、亚声速喷管以及三种流动状态的鼓包检查；实测结果见 `validation/thermal_compressible_validation.md`。
+
+### 5.7.8 压力基高马赫 SIMPLE 与鼓包流动
+
+本程序的可压缩计算统一采用压力基 SIMPLE，不使用密度基守恒变量求解器。主要未知量为 $\mathbf U$、$p$ 和总焓 $H$，温度由 $T=(H-K)/c_p$ 恢复，密度再由 $\rho=p/(RT)$ 更新。高马赫数计算仍求解式（5.98）的压力修正方程：速度修正提供压力扩散项，密度修正提供压力存储和压力对流项。内部面的 $Q_f^*\Psi_fp_f'$ 按质量流量方向迎风取值，因此超声速区的压力修正保持上游依赖，而不被处理成纯椭圆 Poisson 方程。
+
+动量和总焓方程采用有限体积守恒形式。所有对流通量默认使用二阶迎风：隐式矩阵保留一阶迎风系数，外迭代中再加入线性重构的延迟修正。设质量流量确定的上游单元为 $U$，则界面值为 $\phi_f=\phi_U+\alpha_U\mathbf g_U\cdot(\mathbf x_f-\mathbf x_U)$；无限制器时 $\alpha_U=1$。程序不再提供中心/迎风混合系数。
+
+`gradient_limiter = barth_jespersen` 时，$\alpha_U$ 按第4.5.4.6节由局部单元/邻居极值和界面形心检查点计算；`gradient_limiter = none` 为缺省。矢量各分量分别作为标量限制。限制只作用于对流重构，压力修正、Rhie–Chow 插值和扩散项仍使用未限制梯度，以保持压力—速度修正的一致性。鼓包算例显式启用该限制器，并与动量扩散、热传导共同使激波在数个单元内平滑过渡。程序不含 Riemann 求解器；激波厚度和峰值仍依赖网格、限制器及耗散参数。
+
+亚声速出口给定静压并取 $p_b'=0$。超声速出口的速度、温度和压力均为零梯度，不能用固定的出口静压代替物理外推。对质量流量为正的零梯度出流面，压力方程和质量流量修正必须包含出口密度修正：
+
+$$
+a_{P,b}\mathrel{+}=\max(Q_b^*,0)\Psi_P,
+\qquad
+\dot m_b\leftarrow\dot m_b^*+\max(Q_b^*,0)\Psi_Pp_P',
+\qquad Q_b^*=\dot m_b^*/\rho_b^*.
+\tag{5.100}
+$$
+
+若省略这一项，压力方程会漏掉出流面的密度修正，单元质量残差也不能按同一 $p'$ 更新。固定速度且固定压力的超声速入口质量流量保持给定值；滑移壁面的质量流量为零。
+
+鼓包算例位于 `cases/compressible_bump/`。通道长3、高1，鼓包弦长1并位于下壁面 $1\le x\le2$。圆弧半径及型面为
+
+$$
+R=\frac{h^2+(c/2)^2}{2h},
+\qquad y=h-R+\sqrt{R^2-(x-1.5)^2}.
+\tag{5.101}
+$$
+
+亚声速和跨声速算例取 $h=0.1$、入口 $M=0.5$ 和 $0.675$；超声速算例取 $h=0.04$、入口 $M=1.4$。三者均采用 $90\times24$ 四边形网格。入口给定静态速度、绝对静压和静温，以固定入口质量流量并避免本同位网格算例中速度进口与零梯度静压组合引起的压力漂移；相应的总温、总压可由等熵关系恢复。该静态入口不是特征无反射边界，入口附近与文献结果的差异应在验证时单独考察。
+
+所有鼓包算例通过 `flow_model = compressible` 调用同一稳态 SIMPLE 外迭代。每次外迭代依次求解动量、压力修正和总焓方程，并检查速度、压力、恢复温度、密度、总焓闭合关系和单元质量残差。跨声速出口马赫数与 Favini 等人的结果比较，超声速则检查激波位置、反射结构和壁面 Mach 分布。`make validate-bump` 生成网格并从给定初始场执行全部三个流动状态，结果写入 `validation/bump_metrics.csv` 和 `validation/thermal_compressible_validation.md`。
 
 ## 本章小结
 
@@ -1259,3 +1481,6 @@ SIMPLE 通过“动量预测—压力修正—速度修正”的分离迭代实�
 10. de Vahl Davis, G. Natural convection of air in a square cavity: a bench mark numerical solution. *International Journal for Numerical Methods in Fluids*, 1983, 3: 249–264. [DOI: 10.1002/fld.1650030305](https://onlinelibrary.wiley.com/doi/10.1002/fld.1650030305)；基准值转载表可见 [Khanafer 等的开放文献](https://pmc.ncbi.nlm.nih.gov/articles/PMC3605369/)。
 11. Evrard, F., and van Wachem, B. G. M. Conservative finite-volume framework and pressure-based algorithm for flows of incompressible, ideal-gas and real-gas fluids at all speeds. *Journal of Computational Physics*, 2020. [开放手稿](https://arxiv.org/abs/2002.10482)。
 12. Krumov, K., Penkova, N., and Zlateva, P. CFD analysis of compressible flows through nozzles and diffusers. *U.P.B. Scientific Bulletin, Series D*, 2021, 83(2): 149–158. [全文](https://www.scientificbulletin.upb.ro/static/pdfs/full53d_123872.pdf)。
+13. Economon, T. D. [Inviscid Bump in a Channel, SU2 Tutorial](https://su2code.github.io/tutorials/Inviscid_Bump/). 圆弧鼓包几何、滑移壁面与总温总压进口设置。
+14. Kasturi Rangan, M. L. N. V., and Ghosh, S. A face-based immersed boundary method for compressible flows using a uniform interpolation stencil. *Frontiers in Mechanical Engineering*, 2022, 8: 903492. [开放全文](https://www.frontiersin.org/journals/mechanical-engineering/articles/10.3389/fmech.2022.903492/full)。跨声速鼓包及出口 Mach 数引用值。
+15. Djavareshkian, M. H., and Farnak, M. Application of UNO scheme for steady and transient compressible flow in pressure-based method. *Journal of Applied Sciences*, 2008, 8: 3361–3370. [全文](https://scialert.net/fulltext/?doi=jas.2008.3361.3370)。跨声速、超声速鼓包壁面 Mach 和压力分布。

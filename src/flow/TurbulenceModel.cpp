@@ -54,7 +54,6 @@ TurbulenceModel::TurbulenceModel(const Mesh& mesh, const Config& config,
                                  double density, double viscosity, TurbulenceModelKind kind)
     : mesh_(mesh), config_(config), boundaryConditions_(boundaryConditions), density_(density),
       viscosity_(viscosity), kind_(kind), relaxation_(config.number("turbulence_relaxation", 0.5)),
-      convectionBlending_(config.number("turbulence_convection_blending", 0.0)),
       minimumK_(config.number("minimum_k", 1.0e-12)),
       minimumEpsilon_(config.number("minimum_epsilon", 1.0e-12)),
       minimumOmega_(config.number("minimum_omega", 1.0e-8)),
@@ -76,9 +75,6 @@ TurbulenceModel::TurbulenceModel(const Mesh& mesh, const Config& config,
       kSystem_(static_cast<int>(mesh.cells.size())), scaleSystem_(static_cast<int>(mesh.cells.size())) {
     if (relaxation_ <= 0.0 || relaxation_ > 1.0) {
         throw std::runtime_error("turbulence_relaxation must be in (0, 1]");
-    }
-    if (convectionBlending_ < 0.0 || convectionBlending_ > 1.0) {
-        throw std::runtime_error("turbulence_convection_blending must be between zero and one");
     }
     if (minimumK_ <= 0.0 || minimumEpsilon_ <= 0.0 || minimumOmega_ <= 0.0 ||
         maximumEddyViscosityRatio_ <= 0.0) {
@@ -284,10 +280,11 @@ LinearSolveInfo TurbulenceModel::solveField(
     const TimeDerivative timeDerivative(config_.get("time_scheme", "steady"));
     ScalarTransportEquation equation{field, previous, old, oldOld, massFlux, diffusivity, source,
         destruction, constrained, constrainedValues, density_, TimeCoefficients{}, relaxation_,
-        convectionBlending_, config_.number("linear_tolerance", 1.0e-9),
+        config_.number("linear_tolerance", 1.0e-9),
         config_.number("linear_absolute_tolerance", 1.0e-12),
         config_.integer("maximum_linear_iterations", 1000),
         config_.get("turbulence_ksp", "bcgs"), config_.get("turbulence_pc", "ilu")};
+    equation.barthJespersen = useBarthJespersenLimiter(config_);
     equation.time = timeDerivative.coefficients(dt, hasOldOld);
     return solveScalarTransport(mesh_, gradient, system, equation);
 }

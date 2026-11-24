@@ -14,8 +14,7 @@ initial_temperature = 300
 viscous_dissipation = false
 
 gradient = least_squares
-convection_blending = 0.0
-energy_convection_blending = 0.0
+gradient_limiter = barth_jespersen
 velocity_relaxation = 0.3
 pressure_relaxation = 0.02
 energy_relaxation = 0.3

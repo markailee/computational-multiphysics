@@ -55,9 +55,46 @@ def nozzle(level, nx, ny):
     write_msh(ROOT / "compressible_nozzle" / "mesh" / f"nozzle_{level}.msh", nodes, cells, patches)
 
 
+def bump(height, nx=90, ny=24):
+    radius = (0.25 + height * height) / (2 * height)
+
+    def lower_wall(x):
+        if 1.0 <= x <= 2.0:
+            return height - radius + (radius * radius - (x - 1.5) ** 2) ** 0.5
+        return 0.0
+
+    grid = []
+    for j in range(ny + 1):
+        eta = j / ny
+        row = []
+        for i in range(nx + 1):
+            x = 3.0 * i / nx
+            lower = lower_wall(x)
+            row.append((x, lower + (1.0 - lower) * eta))
+        grid.append(row)
+    nodes, cells = quad_regions([grid])
+    patches = defaultdict(list)
+    for a, b in boundary_edges(cells):
+        x = (nodes[a][0] + nodes[b][0]) / 2
+        y = (nodes[a][1] + nodes[b][1]) / 2
+        if abs(x) < 1e-12:
+            name = "inlet"
+        elif abs(x - 3.0) < 1e-12:
+            name = "outlet"
+        elif abs(y - 1.0) < 1e-12:
+            name = "upper_wall"
+        else:
+            name = "lower_wall"
+        patches[name].append((a, b))
+    tag = "10" if abs(height - 0.1) < 1e-12 else "04"
+    write_msh(ROOT / "compressible_bump" / "mesh" / f"bump_{tag}.msh", nodes, cells, patches)
+
+
 if __name__ == "__main__":
     for level, n in (("coarse", 16), ("medium", 24), ("fine", 32)):
         cavity(level, n)
     conduction()
     for level, nx, ny in (("coarse", 40, 4), ("medium", 60, 6), ("fine", 80, 8)):
         nozzle(level, nx, ny)
+    bump(0.1)
+    bump(0.04)

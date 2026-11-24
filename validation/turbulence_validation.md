@@ -26,7 +26,7 @@ The momentum equation uses the Boussinesq closure
 -\rho\overline{u_i'u_j'}=2\mu_t\left(S_{ij}-\frac13S_{kk}\delta_{ij}\right)-\frac23\rho k\delta_{ij}.
 \]
 
-The implementation includes face-interpolated \(\mu+\mu_t\), the variable-eddy-viscosity transpose-stress correction, and the frozen \(-\nabla(2\rho k/3)\) term. Thus `p` is static pressure rather than modified pressure. Turbulence equations use conservative mass-flux convection, implicit upwind plus optional deferred correction, variable diffusion, and the same steady/Euler/BDF2 history mechanism as momentum.
+The implementation includes face-interpolated \(\mu+\mu_t\), the variable-eddy-viscosity transpose-stress correction, and the frozen \(-\nabla(2\rho k/3)\) term. Thus `p` is static pressure rather than modified pressure. Turbulence equations use conservative mass-flux convection, an implicit first-order upwind matrix with second-order upwind deferred reconstruction, variable diffusion, and the same steady/Euler/BDF2 history mechanism as momentum. Most supplied cases enable the Barth–Jespersen limiter for convective reconstruction; the fine SST elbow uses the default unlimited reconstruction.
 
 Each outer iteration performs momentum prediction, pressure/velocity correction, \(k\) and scale-equation solves, and an eddy-viscosity update. Convergence requires velocity, pressure, turbulence, and cell-continuity criteria simultaneously.
 
@@ -86,9 +86,9 @@ The first-cell \(y^+\) values reported below are minima/maxima over the relevant
 
 | Level | Cells | Iterations | \(y^+\) min–max | \(C_f\) RMSE | \(C_f\) max relative error | \(u^+\) RMSE | Drag coefficient |
 |---|---:|---:|---:|---:|---:|---:|---:|
-| Coarse | 4,500 | 416 | 69.67–90.11 | 6.896% | 10.432% | 1.701% | 0.00143718 |
-| Medium | 9,380 | 730 | 43.54–54.64 | 6.973% | 10.701% | 1.849% | 0.00143746 |
-| Fine | 20,000 | 1,399 | 26.14–32.75 | 6.828% | 10.643% | 2.061% | 0.00143810 |
+| Coarse | 4,500 | 409 | 69.81–89.65 | 6.836% | 10.349% | 1.684% | 0.00144102 |
+| Medium | 9,380 | 722 | 43.60–54.88 | 6.850% | 10.465% | 1.839% | 0.00144115 |
+| Fine | 20,000 | 1,389 | 26.17–33.04 | 6.812% | 10.623% | 2.052% | 0.00144132 |
 
 The \(C_f\) and integrated-drag results are nearly insensitive to this grid/\(y^+\) sequence. The Coles-profile error remains near 2%. This is a grid and near-wall-spacing sensitivity study, not a formal order-of-accuracy measurement.
 
@@ -96,9 +96,9 @@ The \(C_f\) and integrated-drag results are nearly insensitive to this grid/\(y^
 
 | Level | Cells | Iterations | \(y^+\) min–max | \(C_f\) RMSE | \(C_f\) max relative error | \(u^+\) RMSE | Drag coefficient |
 |---|---:|---:|---:|---:|---:|---:|---:|
-| Coarse | 4,500 | 1,280 | 1.802–2.356 | 3.288% | 5.249% | 6.855% | 0.00158191 |
-| Medium | 9,380 | 2,200 | 0.879–1.114 | 4.385% | 7.789% | 2.305% | 0.00147747 |
-| Fine | 20,000 | 3,341 | 0.437–0.552 | 6.172% | 9.814% | 1.393% | 0.00144827 |
+| Coarse | 4,500 | 1,247 | 1.803–2.338 | 2.775% | 4.593% | 6.812% | 0.00157507 |
+| Medium | 9,380 | 4,015 | 0.880–1.111 | 4.785% | 8.283% | 2.395% | 0.00147422 |
+| Fine | 20,000 | 3,358 | 0.437–0.551 | 6.451% | 10.198% | 1.398% | 0.00144721 |
 
 SST improves the Coles profile as the near-wall mesh is refined, while the \(C_f\) RMSE increases from its especially good coarse-grid value. Fine-grid drag is close to the \(k\)-\(\varepsilon\) value. The coarse SST grid is already in a low-\(y^+\) regime, so these trends should not be interpreted as a monotone formal convergence rate.
 
@@ -108,8 +108,8 @@ For a representative point at \(x=0.9743\) on the medium grids, the reference is
 
 | Model | Computed \(Re_\theta\) | Numerical \(C_f\) | Reference \(C_f\) | Relative error |
 |---|---:|---:|---:|---:|
-| \(k\)-\(\varepsilon\) | 5426.3 | 0.0027052 | 0.0029587 | -8.57% |
-| SST | 5629.5 | 0.0027736 | 0.0029375 | -5.58% |
+| \(k\)-\(\varepsilon\) | 5367.3 | 0.0027122 | 0.0029651 | -8.53% |
+| SST | 5513.7 | 0.0027679 | 0.0029495 | -6.16% |
 
 - [Skin friction versus momentum-thickness Reynolds number](figures/plate_cf_comparison.svg)
 - [Coles velocity profile comparison](figures/plate_uplus_comparison.svg)
@@ -119,16 +119,16 @@ For a representative point at \(x=0.9743\) on the medium grids, the reference is
 
 | Model | Level | Cells | Iterations | \(y^+\) min–max | 75° normalized RMSE | Maximum relative error | Pressure drop | Loss coefficient |
 |---|---|---:|---:|---:|---:|---:|---:|---:|
-| \(k\)-\(\varepsilon\) | Coarse | 3,960 | 846 | 23.94–37.64 | 18.076% | 41.660% | 0.143943 | 0.287885 |
-| \(k\)-\(\varepsilon\) | Medium | 8,500 | 1,436 | 16.98–27.49 | 18.143% | 41.934% | 0.135059 | 0.270118 |
-| \(k\)-\(\varepsilon\) | Fine | 16,800 | 2,466 | 12.02–20.59 | 18.233% | 41.946% | 0.129836 | 0.259672 |
-| SST | Coarse | 3,960 | 732 | 1.564–4.008 | 17.751% | 41.224% | 0.167555 | 0.335110 |
-| SST | Medium | 8,500 | 1,253 | 0.722–2.231 | 17.752% | 41.690% | 0.142448 | 0.284895 |
-| SST | Fine | 16,800 | 2,119 | 0.350–1.229 | 17.981% | 41.250% | 0.133378 | 0.266756 |
+| \(k\)-\(\varepsilon\) | Coarse | 3,960 | 765 | 23.24–37.44 | 17.749% | 41.339% | 0.116391 | 0.232782 |
+| \(k\)-\(\varepsilon\) | Medium | 8,500 | 1,313 | 16.73–27.67 | 17.923% | 41.674% | 0.117090 | 0.234181 |
+| \(k\)-\(\varepsilon\) | Fine | 16,800 | 2,295 | 11.93–20.73 | 18.069% | 41.747% | 0.117174 | 0.234348 |
+| SST | Coarse | 3,960 | 741 | 1.524–4.047 | 17.474% | 41.196% | 0.138490 | 0.276980 |
+| SST | Medium | 8,500 | 1,263 | 0.688–2.263 | 17.580% | 41.590% | 0.123978 | 0.247955 |
+| SST | Fine | 16,800 | 2,136 | 0.329–1.257 | 17.861% | 41.148% | 0.120446 | 0.240892 |
 
 The pressure drop is the static-pressure difference between uniformly sampled section averages 0.5D inside the straight inlet and 0.5D inside the straight outlet. The loss coefficient uses \(0.5\rho U_b^2\) and includes the complete straight and bent domain; it is not an elbow-only loss coefficient and is not compared directly with a correlation.
 
-The medium-grid minimum streamwise velocity at 75° is 0.625 for \(k\)-\(\varepsilon\) and 0.305 for SST. Both models reproduce the broad velocity redistribution, but neither can represent circumferential Dean vortices or the measured three-dimensional secondary flow. The experimental digitization uncertainty is also much smaller than the 2D/3D modeling discrepancy, so the reported errors must not be used to rank the closures as if this were full 3D validation.
+The medium-grid minimum streamwise velocity at 75° is 0.621 for \(k\)-\(\varepsilon\) and 0.297 for SST. Both models reproduce the broad velocity redistribution, but neither can represent circumferential Dean vortices or the measured three-dimensional secondary flow. The experimental digitization uncertainty is also much smaller than the 2D/3D modeling discrepancy, so the reported errors must not be used to rank the closures as if this were full 3D validation.
 
 [75° numerical/experimental comparison](figures/elbow_75deg_comparison.svg)
 
@@ -164,7 +164,7 @@ make validate-turbulence
 
 - The solver is two-dimensional. The elbow comparison cannot validate three-dimensional secondary flow, swirl, or cross-sectional vortex structure.
 - Both closures are linear eddy-viscosity models without transition, compressibility, buoyancy, rotation/curvature correction, DES, or Reynolds-stress transport.
-- The supplied cases use implicit first-order upwind convection. Grid and first-cell spacing are varied, but no formal spatial convergence order is claimed.
+- All supplied cases use second-order upwind reconstruction with an implicit first-order upwind matrix. The Barth–Jespersen limiter is enabled except for the fine SST elbow, which uses the default unlimited reconstruction. Grid and first-cell spacing are varied, but no formal spatial convergence order is claimed.
 - The flat-plate references are correlations, while the elbow reference contains figure-digitization and planar-mapping uncertainty.
 - Inlet turbulence and farfield conditions affect RANS predictions; the documented values are part of the case definition and should not be changed to tune agreement.
 - The meshes are modest teaching/validation grids, not production grid-independent certifications.

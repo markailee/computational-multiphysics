@@ -17,7 +17,6 @@ end_time = 0.005
 maximum_steps = 1000
 output_interval = 100
 gradient = least_squares
-species_convection_blending = 0.0
 species_relaxation = 1.0
 maximum_iterations = 50
 tolerance = 1.0e-11

@@ -1,0 +1,46 @@
+mesh = ../mesh/bump_10.msh
+output = results/bump_subsonic_final.plt
+flow_model = compressible
+material_model = ideal_gas
+time_scheme = steady
+
+gas_constant = 287.0
+viscosity = 0.5
+thermal_conductivity = 0.5
+specific_heat = 1005.0
+initial_velocity = 173.594354746921 0
+initial_pressure = 85418.9179496902
+initial_temperature = 300.0
+viscous_dissipation = true
+
+gradient = least_squares
+gradient_limiter = barth_jespersen
+velocity_relaxation = 0.3
+pressure_relaxation = 0.02
+energy_relaxation = 0.3
+maximum_iterations = 20000
+tolerance = 1.0e-3
+energy_tolerance = 1.0e-4
+density_tolerance = 1.0e-6
+continuity_tolerance = 1.0e-5
+linear_tolerance = 1.0e-9
+linear_absolute_tolerance = 1.0e-12
+maximum_linear_iterations = 1000
+log_interval = 100
+
+[boundary.inlet]
+velocity = fixedValue 173.594354746921 0
+pressure = fixedValue 85418.9179496902
+temperature = fixedValue 300.0
+[boundary.outlet]
+velocity = zeroGradient
+pressure = fixedValue 84606.375
+temperature = zeroGradient
+[boundary.upper_wall]
+velocity = slip
+pressure = zeroGradient
+temperature = adiabatic
+[boundary.lower_wall]
+velocity = slip
+pressure = zeroGradient
+temperature = adiabatic

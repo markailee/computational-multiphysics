@@ -5,7 +5,6 @@ time_scheme = steady
 density = 1.0
 viscosity = 0.005
 gradient = least_squares
-convection_blending = 1.0
 
 velocity_relaxation = 0.5
 pressure_relaxation = 0.2

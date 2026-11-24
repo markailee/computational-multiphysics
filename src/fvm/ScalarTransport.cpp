@@ -19,6 +19,12 @@ LinearSolveInfo solveScalarTransport(const Mesh& mesh, const GradientScheme& gra
         throw std::runtime_error("Scalar-transport density-field size does not match the mesh");
     }
     const auto gradient = gradientScheme.scalar(equation.field);
+    std::vector<ScalarGradient> limitedGradient;
+    const std::vector<ScalarGradient>* convectionGradient = &gradient;
+    if (equation.barthJespersen) {
+        limitedGradient = applyBarthJespersenLimiter(equation.field, gradient);
+        convectionGradient = &limitedGradient;
+    }
     SparseMatrix matrix(cellCount);
     std::vector<double> rhs(cellCount);
     for (int cell = 0; cell < cellCount; ++cell) {
@@ -59,8 +65,9 @@ LinearSolveInfo solveScalarTransport(const Mesh& mesh, const GradientScheme& gra
         matrix.add(neighbour, neighbour, convection.neighbourDiagonal);
         matrix.add(neighbour, owner, convection.neighbourToOwner);
         const double upwind = flux >= 0.0 ? equation.field[owner] : equation.field[neighbour];
-        const double central = centralFaceValue(mesh, equation.field, gradient, faceIndex);
-        const double deferred = equation.convectionBlending * flux * (central - upwind);
+        const double reconstructed = equation.secondOrderConvection
+            ? secondOrderUpwindFaceValue(mesh, equation.field, *convectionGradient, faceIndex, flux) : upwind;
+        const double deferred = flux * (reconstructed - upwind);
         rhs[owner] -= deferred;
         rhs[neighbour] += deferred;
         if (equation.additionalFaceFlux) {
@@ -80,11 +87,12 @@ LinearSolveInfo solveScalarTransport(const Mesh& mesh, const GradientScheme& gra
         }
 
         const double flux = equation.massFlux[faceIndex];
-        const double central = centralFaceValue(mesh, equation.field, gradient, faceIndex);
-        const double upwind = flux >= 0.0 ? equation.field[owner] : central;
+        const double upwind = flux >= 0.0 ? equation.field[owner] : equation.field.boundary(faceIndex);
+        const double reconstructed = equation.secondOrderConvection
+            ? secondOrderUpwindFaceValue(mesh, equation.field, *convectionGradient, faceIndex, flux) : upwind;
         if (flux >= 0.0) matrix.add(owner, owner, flux);
-        else rhs[owner] -= flux * central;
-        rhs[owner] -= equation.convectionBlending * flux * (central - upwind);
+        else rhs[owner] -= flux * upwind;
+        rhs[owner] -= flux * (reconstructed - upwind);
         if (equation.additionalFaceFlux) rhs[owner] -= (*equation.additionalFaceFlux)[faceIndex];
     }
 
