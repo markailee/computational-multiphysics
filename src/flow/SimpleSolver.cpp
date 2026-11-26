@@ -35,9 +35,10 @@ SimpleSolver::SimpleSolver(const Mesh& mesh, const Config& config, std::filesyst
     : mesh_(mesh), config_(config), caseDirectory_(std::move(caseDirectory)),
       flowModel_(readFlowModel(config)), material_(makeMaterialModel(config)),
       density_(config.number("density", 1.0)), viscosity_(config.number("viscosity", 0.01)),
+      gasConstant_(config.number("gas_constant", 287.0)),
       velocityRelaxation_(config.number("velocity_relaxation", 0.7)),
       pressureRelaxation_(config.number("pressure_relaxation", 0.3)),
-      barthJespersenLimiter_(useBarthJespersenLimiter(config)),
+      gradientLimiter_(readGradientLimiter(config)),
       outerTolerance_(config.number("tolerance", 1.0e-6)),
       continuityTolerance_(config.number("continuity_tolerance", 1.0e-8)),
       linearRelativeTolerance_(config.number("linear_tolerance", 1.0e-9)),
@@ -56,7 +57,8 @@ SimpleSolver::SimpleSolver(const Mesh& mesh, const Config& config, std::filesyst
       oldVelocity_("oldU", mesh),
       oldOldVelocity_("oldOldU", mesh),
       oldPressure_("oldP", mesh, pressure_[0]), oldOldPressure_("oldOldP", mesh, pressure_[0]),
-      massFlux_(mesh.faces.size(), 0.0), densityField_(mesh.cells.size(), density_),
+      massFlux_(mesh.faces.size(), 0.0), faceDensityField_(mesh.faces.size(), density_),
+      densityField_(mesh.cells.size(), density_),
       previousDensityField_(mesh.cells.size(), density_), oldDensityField_(mesh.cells.size(), density_),
       oldOldDensityField_(mesh.cells.size(), density_), viscosityField_(mesh.cells.size(), viscosity_),
       conductivityField_(mesh.cells.size(), 0.0), heatCapacityField_(mesh.cells.size(), 0.0),
@@ -92,6 +94,16 @@ SimpleSolver::SimpleSolver(const Mesh& mesh, const Config& config, std::filesyst
         }
         energy_ = std::make_unique<EnergyModel>(mesh_, config_, true);
         std::cout << "Compressible ideal-gas flow: pressure is absolute\n";
+    }
+    for (std::size_t face = mesh_.internalFaceCount(); face < mesh_.faces.size(); ++face) {
+        if (!boundaryConditions_.totalPressure(face)) continue;
+        if (flowModel_ != FlowModel::Compressible) {
+            throw std::runtime_error("totalPressure boundary requires flow_model = compressible");
+        }
+        if (!energy_ || !energy_->isTotalTemperature(face)) {
+            throw std::runtime_error("totalPressure boundary requires matching totalTemperature boundary on patch " +
+                mesh_.patches[mesh_.faces[face].patch].name);
+        }
     }
     turbulence_ = makeTurbulenceModel(mesh_, config_, boundaryConditions_, density_, viscosity_);
     if (turbulence_) std::cout << "Turbulence model: " << turbulence_->name() << '\n';
@@ -203,7 +215,24 @@ void SimpleSolver::readRestart(const std::filesystem::path& file) {
 
 void SimpleSolver::updateBoundaries() {
     for (std::size_t face = mesh_.internalFaceCount(); face < mesh_.faces.size(); ++face) {
-        const int owner = mesh_.faces[face].owner;
+        const Face& boundaryFace = mesh_.faces[face];
+        const int owner = boundaryFace.owner;
+        if (flowModel_ == FlowModel::Compressible && boundaryConditions_.totalPressure(face)) {
+            const double p0 = boundaryConditions_.totalPressureValue(face);
+            const double t0 = energy_->boundaryValue(face);
+            const double cp = heatCapacityField_[owner];
+            const double gamma = cp / (cp - gasConstant_);
+            const double pStatic = std::clamp(pressure_[owner], 0.05 * p0, (1.0 - 1.0e-6) * p0);
+            const double tStatic = t0 * std::pow(pStatic / p0, (gamma - 1.0) / gamma);
+            const double speed = std::sqrt(std::max(0.0, 2.0 * cp * (t0 - tStatic)));
+            const Vector2 direction = boundaryConditions_.hasInflowDirection(face)
+                ? boundaryConditions_.inflowDirection(face) : -boundaryFace.normal;
+            velocity_.boundary(face) = direction * speed;
+            velocity_.boundaryDirichlet(face) = true;
+            pressure_.boundary(face) = pStatic;
+            pressure_.boundaryDirichlet(face) = false;
+            continue;
+        }
         velocity_.boundary(face) = boundaryConditions_.velocity(face, velocity_[owner]);
         velocity_.boundaryDirichlet(face) = boundaryConditions_.fixedVelocity(face);
         pressure_.boundary(face) = boundaryConditions_.pressure(face, pressure_[owner]);
@@ -247,21 +276,47 @@ void SimpleSolver::updateMaterialProperties() {
     }
 }
 
-double SimpleSolver::faceDensity(std::size_t faceIndex) const {
+double SimpleSolver::boundaryDensity(std::size_t faceIndex) const {
     if (flowModel_ != FlowModel::Compressible) return density_;
-    const Face& face = mesh_.faces[faceIndex];
-    if (!face.isBoundary()) {
-        return face.ownerWeight * densityField_[face.owner] + (1.0 - face.ownerWeight) * densityField_[face.neighbour];
-    }
     MaterialState state;
     state.pressure = pressure_.boundary(faceIndex);
     state.temperature = energy_->temperature().boundary(faceIndex);
     return material_->properties(state).density;
 }
 
+double SimpleSolver::totalInletCoefficient(std::size_t faceIndex) const {
+    const Face& face = mesh_.faces[faceIndex];
+    const int owner = face.owner;
+    const double p0 = boundaryConditions_.totalPressureValue(faceIndex);
+    const double t0 = energy_->boundaryValue(faceIndex);
+    const double cp = heatCapacityField_[owner];
+    const double gamma = cp / (cp - gasConstant_);
+    const double pStatic = std::clamp(pressure_[owner], 0.05 * p0, (1.0 - 1.0e-6) * p0);
+    const double tStatic = t0 * std::pow(pStatic / p0, (gamma - 1.0) / gamma);
+    const double speed = std::sqrt(std::max(0.0, 2.0 * cp * (t0 - tStatic)));
+    const double soundSpeed = std::sqrt(gamma * gasConstant_ * tStatic);
+    const double mach = speed / soundSpeed;
+    if (mach >= 1.0) return 0.0;
+    const Vector2 direction = boundaryConditions_.hasInflowDirection(faceIndex)
+        ? boundaryConditions_.inflowDirection(faceIndex) : -face.normal;
+    const double effectiveArea = std::max(0.0, -face.area * dot(direction, face.normal));
+    return effectiveArea * (1.0 - mach * mach) / std::max(speed, 0.05 * soundSpeed);
+}
+
 void SimpleSolver::computeMassFlux(bool rhieChow) {
     std::vector<ScalarGradient> pressureGradient;
     if (rhieChow) pressureGradient = gradient_->scalar(pressure_);
+    std::vector<ScalarGradient> densityGradient;
+    if (flowModel_ == FlowModel::Compressible && gradientLimiter_ != GradientLimiter::None) {
+        ScalarField densityScalar("rho", mesh_);
+        densityScalar.values() = densityField_;
+        for (std::size_t faceIndex = mesh_.internalFaceCount(); faceIndex < mesh_.faces.size(); ++faceIndex) {
+            densityScalar.boundary(faceIndex) = boundaryDensity(faceIndex);
+            densityScalar.boundaryDirichlet(faceIndex) = boundaryConditions_.fixedPressure(faceIndex) ||
+                boundaryConditions_.totalPressure(faceIndex);
+        }
+        densityGradient = applyGradientLimiter(densityScalar, gradient_->scalar(densityScalar), gradientLimiter_);
+    }
     for (std::size_t faceIndex = 0; faceIndex < mesh_.internalFaceCount(); ++faceIndex) {
         const Face& face = mesh_.faces[faceIndex];
         const Vector2 interpolatedVelocity = interpolate(mesh_, velocity_, faceIndex);
@@ -275,12 +330,32 @@ void SimpleSolver::computeMassFlux(bool rhieChow) {
             const double normalPressureGradient = (pressure_[face.neighbour] - pressure_[face.owner]) / face.delta;
             normalVelocity -= faceD * (normalPressureGradient - dot(interpolatedGradient, face.normal));
         }
-        massFlux_[faceIndex] = faceDensity(faceIndex) * face.area * normalVelocity;
+        if (flowModel_ == FlowModel::Compressible) {
+            const int upwindCell = normalVelocity >= 0.0 ? face.owner : face.neighbour;
+            double rhoFace = densityField_[upwindCell];
+            if (gradientLimiter_ != GradientLimiter::None) {
+                rhoFace = reconstruct(densityField_[upwindCell], densityGradient[upwindCell],
+                                      face.centre - mesh_.cells[upwindCell].centre);
+            }
+            faceDensityField_[faceIndex] = rhoFace;
+        } else {
+            faceDensityField_[faceIndex] = density_;
+        }
+        massFlux_[faceIndex] = faceDensityField_[faceIndex] * face.area * normalVelocity;
     }
     for (std::size_t faceIndex = mesh_.internalFaceCount(); faceIndex < mesh_.faces.size(); ++faceIndex) {
         const Face& face = mesh_.faces[faceIndex];
-        const Vector2 value = boundaryConditions_.velocity(faceIndex, velocity_[face.owner]);
-        massFlux_[faceIndex] = faceDensity(faceIndex) * face.area * dot(value, face.normal);
+        const Vector2 value = velocity_.boundary(faceIndex);
+        double normalVelocity = dot(value, face.normal);
+        if (rhieChow && boundaryConditions_.fixedPressure(faceIndex) && !boundaryConditions_.fixedVelocity(faceIndex)) {
+            const double ownerD = mesh_.cells[face.owner].volume / momentumDiagonal_[face.owner];
+            const Vector2 centreDistance = face.centre - mesh_.cells[face.owner].centre;
+            const double pressureJump = (pressure_.boundary(faceIndex) - pressure_[face.owner]) -
+                dot(pressureGradient[face.owner], centreDistance);
+            normalVelocity -= ownerD * pressureJump * (face.delta / normSquared(centreDistance));
+        }
+        faceDensityField_[faceIndex] = boundaryDensity(faceIndex);
+        massFlux_[faceIndex] = faceDensityField_[faceIndex] * face.area * normalVelocity;
     }
 }
 
@@ -288,8 +363,8 @@ std::array<LinearSolveInfo, 2> SimpleSolver::solveMomentum(double dt) {
     const auto velocityGradient = gradient_->vector(velocity_);
     std::vector<VectorGradient> limitedVelocityGradient;
     const std::vector<VectorGradient>* convectionGradient = &velocityGradient;
-    if (barthJespersenLimiter_) {
-        limitedVelocityGradient = applyBarthJespersenLimiter(velocity_, velocityGradient);
+    if (gradientLimiter_ != GradientLimiter::None) {
+        limitedVelocityGradient = applyGradientLimiter(velocity_, velocityGradient, gradientLimiter_);
         convectionGradient = &limitedVelocityGradient;
     }
     const auto pressureGradient = gradient_->scalar(pressure_);
@@ -407,6 +482,20 @@ std::array<LinearSolveInfo, 2> SimpleSolver::solveMomentum(double dt) {
     }
 
     for (int cell = 0; cell < cellCount; ++cell) {
+        const Cell& controlVolume = mesh_.cells[cell];
+        double imbalance = controlVolume.volume * (time.current * densityField_[cell] -
+            time.previous * oldDensityField_[cell] - time.previousPrevious * oldOldDensityField_[cell]);
+        for (std::size_t i = 0; i < controlVolume.faces.size(); ++i) {
+            imbalance += controlVolume.faceSigns[i] * massFlux_[controlVolume.faces[i]];
+        }
+        if (imbalance < 0.0) {
+            matrix.add(cell, cell, -imbalance);
+        } else if (imbalance > 0.0) {
+            rhs[cell] += previousVelocity_[cell] * imbalance;
+        }
+    }
+
+    for (int cell = 0; cell < cellCount; ++cell) {
         const double diagonal = matrix.diagonal(cell);
         if (!(diagonal > 0.0)) throw std::runtime_error("Non-positive momentum diagonal; check mesh and boundary conditions");
         const double relaxation = diagonal * (1.0 / velocityRelaxation_ - 1.0);
@@ -444,7 +533,7 @@ LinearSolveInfo SimpleSolver::correctPressure(double dt) {
     if (compressible) {
         for (int cell = 0; cell < cellCount; ++cell) {
             const double volume = mesh_.cells[cell].volume;
-            matrix.add(cell, cell, pressureDerivativeField_[cell] * volume * time.current);
+            matrix.add(cell, cell, pressureRelaxation_ * pressureDerivativeField_[cell] * volume * time.current);
             rhs[cell] -= volume * (time.current * densityField_[cell]
                 - time.previous * oldDensityField_[cell]
                 - time.previousPrevious * oldOldDensityField_[cell]);
@@ -452,7 +541,7 @@ LinearSolveInfo SimpleSolver::correctPressure(double dt) {
     }
     for (std::size_t faceIndex = 0; faceIndex < mesh_.internalFaceCount(); ++faceIndex) {
         const Face& face = mesh_.faces[faceIndex];
-        const double density = faceDensity(faceIndex);
+        const double density = faceDensityField_[faceIndex];
         const double coefficient = rhieChowCoefficient(mesh_, faceIndex, momentumDiagonal_, density);
         matrix.add(face.owner, face.owner, coefficient);
         matrix.add(face.owner, face.neighbour, -coefficient);
@@ -462,8 +551,8 @@ LinearSolveInfo SimpleSolver::correctPressure(double dt) {
         rhs[face.neighbour] += massFlux_[faceIndex];
         if (compressible) {
             const double volumetricFlux = massFlux_[faceIndex] / density;
-            const double upwindDerivative = volumetricFlux >= 0.0
-                ? pressureDerivativeField_[face.owner] : pressureDerivativeField_[face.neighbour];
+            const double upwindDerivative = pressureRelaxation_ * (volumetricFlux >= 0.0
+                ? pressureDerivativeField_[face.owner] : pressureDerivativeField_[face.neighbour]);
             const ConvectionCoefficients convection = upwindConvection(volumetricFlux * upwindDerivative);
             matrix.add(face.owner, face.owner, convection.ownerDiagonal);
             matrix.add(face.owner, face.neighbour, convection.ownerToNeighbour);
@@ -471,15 +560,21 @@ LinearSolveInfo SimpleSolver::correctPressure(double dt) {
             matrix.add(face.neighbour, face.owner, convection.neighbourToOwner);
         }
     }
+    std::vector<double> totalInletCoefficients(mesh_.faces.size() - mesh_.internalFaceCount(), 0.0);
     for (std::size_t faceIndex = mesh_.internalFaceCount(); faceIndex < mesh_.faces.size(); ++faceIndex) {
         const Face& face = mesh_.faces[faceIndex];
-        const double density = faceDensity(faceIndex);
-        if (boundaryConditions_.fixedPressure(faceIndex) && !boundaryConditions_.fixedVelocity(faceIndex)) {
+        const double density = faceDensityField_[faceIndex];
+        if (compressible && boundaryConditions_.totalPressure(faceIndex)) {
+            const double coefficient = pressureRelaxation_ * totalInletCoefficient(faceIndex);
+            totalInletCoefficients[faceIndex - mesh_.internalFaceCount()] = coefficient;
+            matrix.add(face.owner, face.owner, coefficient);
+        } else if (boundaryConditions_.fixedPressure(faceIndex) && !boundaryConditions_.fixedVelocity(faceIndex)) {
             const double coefficient = rhieChowCoefficient(mesh_, faceIndex, momentumDiagonal_, density);
             matrix.add(face.owner, face.owner, coefficient);
         } else if (compressible && !boundaryConditions_.fixedPressure(faceIndex) &&
                    !boundaryConditions_.fixedVelocity(faceIndex) && massFlux_[faceIndex] > 0.0) {
-            const double coefficient = massFlux_[faceIndex] / density * pressureDerivativeField_[face.owner];
+            const double coefficient = massFlux_[faceIndex] / density * pressureRelaxation_ *
+                pressureDerivativeField_[face.owner];
             matrix.add(face.owner, face.owner, coefficient);
         }
         rhs[face.owner] -= massFlux_[faceIndex];
@@ -488,6 +583,7 @@ LinearSolveInfo SimpleSolver::correctPressure(double dt) {
         matrix.pinZero(0);
         rhs[0] = 0.0;
     }
+    std::fill(pressureCorrection_.values().begin(), pressureCorrection_.values().end(), 0.0);
     pressureSystem_.setMatrix(matrix);
     const std::string defaultSolver = compressible ? "bcgs" : "cg";
     const std::string defaultPreconditioner = compressible ? "ilu" : "icc";
@@ -515,28 +611,31 @@ LinearSolveInfo SimpleSolver::correctPressure(double dt) {
     }
     for (std::size_t faceIndex = 0; faceIndex < mesh_.internalFaceCount(); ++faceIndex) {
         const Face& face = mesh_.faces[faceIndex];
-        const double density = faceDensity(faceIndex);
+        const double density = faceDensityField_[faceIndex];
         const double predictedMassFlux = massFlux_[faceIndex];
         const double coefficient = rhieChowCoefficient(mesh_, faceIndex, momentumDiagonal_, density);
         massFlux_[faceIndex] += coefficient * (pressureCorrection_[face.owner] - pressureCorrection_[face.neighbour]);
         if (compressible) {
             const double volumetricFlux = predictedMassFlux / density;
-            massFlux_[faceIndex] += volumetricFlux * (volumetricFlux >= 0.0
+            massFlux_[faceIndex] += volumetricFlux * pressureRelaxation_ * (volumetricFlux >= 0.0
                 ? pressureCorrection_[face.owner] * pressureDerivativeField_[face.owner]
                 : pressureCorrection_[face.neighbour] * pressureDerivativeField_[face.neighbour]);
         }
     }
     for (std::size_t faceIndex = mesh_.internalFaceCount(); faceIndex < mesh_.faces.size(); ++faceIndex) {
         const int owner = mesh_.faces[faceIndex].owner;
-        const double density = faceDensity(faceIndex);
+        const double density = faceDensityField_[faceIndex];
         const double predictedMassFlux = massFlux_[faceIndex];
-        if (boundaryConditions_.fixedPressure(faceIndex) && !boundaryConditions_.fixedVelocity(faceIndex)) {
+        if (compressible && boundaryConditions_.totalPressure(faceIndex)) {
+            massFlux_[faceIndex] += totalInletCoefficients[faceIndex - mesh_.internalFaceCount()] *
+                pressureCorrection_[owner];
+        } else if (boundaryConditions_.fixedPressure(faceIndex) && !boundaryConditions_.fixedVelocity(faceIndex)) {
             const double coefficient = rhieChowCoefficient(mesh_, faceIndex, momentumDiagonal_, density);
             massFlux_[faceIndex] += coefficient * pressureCorrection_[owner];
         } else if (compressible && !boundaryConditions_.fixedPressure(faceIndex) &&
                    !boundaryConditions_.fixedVelocity(faceIndex) && predictedMassFlux > 0.0) {
-            massFlux_[faceIndex] += predictedMassFlux / density * pressureDerivativeField_[owner] *
-                pressureCorrection_[owner];
+            massFlux_[faceIndex] += predictedMassFlux / density * pressureRelaxation_ *
+                pressureDerivativeField_[owner] * pressureCorrection_[owner];
         }
     }
     updateBoundaries();

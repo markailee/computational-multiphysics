@@ -17,15 +17,11 @@ The subsonic and transonic meshes use `h = 0.1`; the supersonic mesh uses `h = 0
 
 | Case | Prescribed inlet state | Outlet | Other boundaries |
 |---|---|---|---|
-| Subsonic | `M = 0.5`; velocity `173.5943547 m/s`; static temperature `300 K`; absolute pressure `85418.91795 Pa` | Static pressure `84606.375 Pa` | Slip walls and adiabatic walls |
-| Transonic | `M = 0.675`; velocity `230.3397546 m/s`; static temperature `289.8146409 K`; absolute pressure `103551.51194 Pa` | Static pressure `101300 Pa` | Slip walls and adiabatic walls |
+| Subsonic | Total pressure `101325 Pa`; total temperature `315 K`; flow direction `(1, 0)` | Static pressure `84606.375 Pa` | Slip walls and adiabatic walls |
+| Transonic | Total pressure `140513.23 Pa`; total temperature `316.224 K`; flow direction `(1, 0)` | Static pressure `101300 Pa` | Slip walls and adiabatic walls |
 | Supersonic | `M = 1.4`; velocity `486.0641933 m/s`; static temperature `300 K`; absolute pressure `101325 Pa` | Zero-gradient velocity, pressure, and temperature | Slip walls and adiabatic walls |
 
-The subsonic inlet state corresponds to total temperature `315 K` and total pressure `101325 Pa`; the transonic state corresponds to `316.224 K` and `140513.23 Pa`. Prescribing the static inlet state fixes the inlet mass flux and avoids the static-pressure drift observed with a fixed-velocity/zero-gradient-pressure inlet on this collocated grid. It is not a non-reflecting characteristic boundary.
-
-All cases use `gas_constant = 287`, `specific_heat = 1005`, second-order upwind momentum and energy convection, and steady SIMPLE outer iterations. They set `gradient_limiter = barth_jespersen`; the default when this option is omitted is `gradient_limiter = none`. The implicit transport matrix remains first-order upwind, while the deferred face correction uses upwind-cell linear reconstruction. The pressure equation includes density storage in transient mode, upwind density/pressure convection, and Rhie–Chow velocity correction. At an extrapolated compressible outflow, the outgoing density correction is included in both the pressure matrix and mass-flux update.
-
-The limiter constrains each reconstructed face-centroid value to the local cell/neighbour range and is applied only to convective reconstruction, not to pressure correction, Rhie–Chow interpolation, or diffusion. The specified viscosity and conductivity provide additional numerical stabilization with consistent viscous dissipation. Shock thickness and peak Mach number remain grid-, limiter-, and dissipation-dependent.
+All three cases are strictly inviscid (`viscosity = 0`, `thermal_conductivity = 0`, `viscous_dissipation = false`) and use `gas_constant = 287`, `specific_heat = 1005`, second-order upwind momentum, density, and energy convection with `gradient_limiter = venkatakrishnan`, and steady SIMPLE outer iterations with under-relaxation factors `0.5`, `0.3`, and `0.5` for velocity, pressure, and temperature. The implicit transport matrix remains first-order upwind, while the deferred face correction uses upwind-cell linear reconstruction. The pressure-correction equation includes consistent pressure-relaxed density storage in transient mode, upwind density/pressure convection, Rhie–Chow velocity correction, implicit total-pressure inlet linearization, and outgoing density correction at extrapolated compressible outflows.
 
 ## Run and validation
 

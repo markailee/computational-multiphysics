@@ -284,7 +284,7 @@ LinearSolveInfo TurbulenceModel::solveField(
         config_.number("linear_absolute_tolerance", 1.0e-12),
         config_.integer("maximum_linear_iterations", 1000),
         config_.get("turbulence_ksp", "bcgs"), config_.get("turbulence_pc", "ilu")};
-    equation.barthJespersen = useBarthJespersenLimiter(config_);
+    equation.gradientLimiter = readGradientLimiter(config_);
     equation.time = timeDerivative.coefficients(dt, hasOldOld);
     return solveScalarTransport(mesh_, gradient, system, equation);
 }

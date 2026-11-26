@@ -21,8 +21,11 @@ LinearSolveInfo solveScalarTransport(const Mesh& mesh, const GradientScheme& gra
     const auto gradient = gradientScheme.scalar(equation.field);
     std::vector<ScalarGradient> limitedGradient;
     const std::vector<ScalarGradient>* convectionGradient = &gradient;
-    if (equation.barthJespersen) {
-        limitedGradient = applyBarthJespersenLimiter(equation.field, gradient);
+    const GradientLimiter activeLimiter = equation.gradientLimiter != GradientLimiter::None
+        ? equation.gradientLimiter
+        : (equation.barthJespersen ? GradientLimiter::BarthJespersen : GradientLimiter::None);
+    if (activeLimiter != GradientLimiter::None) {
+        limitedGradient = applyGradientLimiter(equation.field, gradient, activeLimiter);
         convectionGradient = &limitedGradient;
     }
     SparseMatrix matrix(cellCount);
@@ -94,6 +97,24 @@ LinearSolveInfo solveScalarTransport(const Mesh& mesh, const GradientScheme& gra
         else rhs[owner] -= flux * upwind;
         rhs[owner] -= flux * (reconstructed - upwind);
         if (equation.additionalFaceFlux) rhs[owner] -= (*equation.additionalFaceFlux)[faceIndex];
+    }
+
+    for (int cell = 0; cell < cellCount; ++cell) {
+        if (equation.constrainedCells[cell]) continue;
+        const Cell& controlVolume = mesh.cells[cell];
+        const double currentDensity = equation.densityField ? (*equation.densityField)[cell] : equation.density;
+        const double oldDensity = equation.oldDensityField ? (*equation.oldDensityField)[cell] : currentDensity;
+        const double oldOldDensity = equation.oldOldDensityField ? (*equation.oldOldDensityField)[cell] : oldDensity;
+        double imbalance = controlVolume.volume * (equation.time.current * currentDensity -
+            equation.time.previous * oldDensity - equation.time.previousPrevious * oldOldDensity);
+        for (std::size_t i = 0; i < controlVolume.faces.size(); ++i) {
+            imbalance += controlVolume.faceSigns[i] * equation.massFlux[controlVolume.faces[i]];
+        }
+        if (imbalance < 0.0) {
+            matrix.add(cell, cell, -imbalance);
+        } else if (imbalance > 0.0) {
+            rhs[cell] += imbalance * equation.previous[cell];
+        }
     }
 
     for (int cell = 0; cell < cellCount; ++cell) {

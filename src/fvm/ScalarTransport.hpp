@@ -34,6 +34,7 @@ struct ScalarTransportEquation {
     const std::vector<double>* oldDensityField = nullptr;
     const std::vector<double>* oldOldDensityField = nullptr;
     bool barthJespersen = false;
+    GradientLimiter gradientLimiter = GradientLimiter::None;
     bool secondOrderConvection = true;
 };
 

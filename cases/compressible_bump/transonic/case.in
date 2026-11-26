@@ -5,33 +5,33 @@ material_model = ideal_gas
 time_scheme = steady
 
 gas_constant = 287.0
-viscosity = 2.0
-thermal_conductivity = 2.0
+viscosity = 0.0
+thermal_conductivity = 0.0
 specific_heat = 1005.0
 initial_velocity = 230.339754553282 0
 initial_pressure = 103551.51193872
 initial_temperature = 289.814640852331
-viscous_dissipation = true
+viscous_dissipation = false
 
 gradient = least_squares
-gradient_limiter = barth_jespersen
-velocity_relaxation = 0.1
-pressure_relaxation = 0.002
-energy_relaxation = 0.1
-maximum_iterations = 60000
-tolerance = 1.0e-3
-energy_tolerance = 1.0e-4
-density_tolerance = 1.0e-6
-continuity_tolerance = 1.0e-5
+gradient_limiter = venkatakrishnan
+velocity_relaxation = 0.5
+pressure_relaxation = 0.3
+energy_relaxation = 0.5
+maximum_iterations = 5000
+tolerance = 1.0e-4
+energy_tolerance = 1.0e-5
+density_tolerance = 1.0e-7
+continuity_tolerance = 1.0e-7
 linear_tolerance = 1.0e-9
 linear_absolute_tolerance = 1.0e-12
 maximum_linear_iterations = 1000
 log_interval = 100
 
 [boundary.inlet]
-velocity = fixedValue 230.339754553282 0
-pressure = fixedValue 103551.51193872
-temperature = fixedValue 289.814640852331
+velocity = direction 1 0
+pressure = totalPressure 140513.23
+temperature = totalTemperature 316.224
 [boundary.outlet]
 velocity = zeroGradient
 pressure = fixedValue 101300.0

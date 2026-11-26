@@ -10,7 +10,7 @@
 
 namespace mp {
 
-enum class EnergyBoundaryType { FixedValue, ZeroGradient, FixedHeatFlux };
+enum class EnergyBoundaryType { FixedValue, ZeroGradient, FixedHeatFlux, TotalTemperature };
 
 struct EnergyBoundaryCondition {
     EnergyBoundaryType type = EnergyBoundaryType::ZeroGradient;
@@ -37,6 +37,8 @@ public:
     ScalarField& temperature() { return temperature_; }
     const ScalarField& temperature() const { return temperature_; }
     const ScalarField& totalEnthalpy() const { return totalEnthalpy_; }
+    bool isTotalTemperature(std::size_t faceIndex) const;
+    double boundaryValue(std::size_t faceIndex) const;
     double change() const { return change_; }
     bool temperatureLimited() const { return temperatureLimited_; }
     int linearIterations() const { return linearIterations_; }

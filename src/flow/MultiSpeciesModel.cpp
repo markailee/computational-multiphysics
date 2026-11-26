@@ -236,7 +236,7 @@ void MultiSpeciesModel::solve(double dt, bool hasOldOld, const std::vector<doubl
             carrierDensity, time, relaxation_, linearRelativeTolerance_,
             linearAbsoluteTolerance_, maximumLinearIterations_, config_.get("species_ksp", "bcgs"),
             config_.get("species_pc", "ilu")};
-        equation.barthJespersen = useBarthJespersenLimiter(config_);
+        equation.gradientLimiter = readGradientLimiter(config_);
         equation.additionalFaceFlux = &correctionFluxes_[k];
         const LinearSolveInfo info = solveScalarTransport(mesh_, gradient, transportSystem_, equation);
         linearIterations_ += info.iterations;

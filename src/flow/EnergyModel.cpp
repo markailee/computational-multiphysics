@@ -50,6 +50,14 @@ EnergyBoundaryCondition EnergyModel::readBoundary(const std::string& patch) cons
         condition.type = EnergyBoundaryType::FixedValue;
         input >> condition.value;
         if (!(condition.value > 0.0)) throw std::runtime_error("Fixed temperature must be positive for " + key);
+    } else if (type == "totaltemperature" || type == "stagnationtemperature" ||
+               type == "total" || type == "stagnation") {
+        if (!compressible_) {
+            throw std::runtime_error("totalTemperature boundary requires compressible flow for " + key);
+        }
+        condition.type = EnergyBoundaryType::TotalTemperature;
+        input >> condition.value;
+        if (!(condition.value > 0.0)) throw std::runtime_error("Total temperature must be positive for " + key);
     } else if (type == "zerogradient" || type == "adiabatic") {
         condition.type = EnergyBoundaryType::ZeroGradient;
         condition.value = 0.0;
@@ -90,11 +98,27 @@ void EnergyModel::updateKineticEnergy(const VectorField& velocity) {
     }
 }
 
+bool EnergyModel::isTotalTemperature(std::size_t faceIndex) const {
+    return boundaries_[mesh_.faces[faceIndex].patch].type == EnergyBoundaryType::TotalTemperature;
+}
+
+double EnergyModel::boundaryValue(std::size_t faceIndex) const {
+    return boundaries_[mesh_.faces[faceIndex].patch].value;
+}
+
 void EnergyModel::updateBoundaries(const VectorField& velocity, const std::vector<double>& heatCapacity) {
     updateKineticEnergy(velocity);
     for (std::size_t face = mesh_.internalFaceCount(); face < mesh_.faces.size(); ++face) {
         const int owner = mesh_.faces[face].owner;
         const EnergyBoundaryCondition& condition = boundaries_[mesh_.faces[face].patch];
+        if (condition.type == EnergyBoundaryType::TotalTemperature) {
+            const double staticTemperature = condition.value - kineticEnergy_.boundary(face) / heatCapacity[owner];
+            temperature_.boundary(face) = std::max(1.0, staticTemperature);
+            temperature_.boundaryDirichlet(face) = true;
+            totalEnthalpy_.boundary(face) = heatCapacity[owner] * condition.value;
+            totalEnthalpy_.boundaryDirichlet(face) = true;
+            continue;
+        }
         const bool fixedTemperature = condition.type == EnergyBoundaryType::FixedValue;
         temperature_.boundaryDirichlet(face) = fixedTemperature;
         temperature_.boundary(face) = fixedTemperature ? condition.value : temperature_[owner];
@@ -183,7 +207,8 @@ LinearSolveInfo EnergyModel::solve(double dt, bool hasOldOld, const std::vector<
                 (compressible_ ? 1.0 : heatCapacity[owner]);
         }
         if (!compressible_) continue;
-        if (condition.type == EnergyBoundaryType::FixedValue) {
+        if (condition.type == EnergyBoundaryType::FixedValue ||
+            condition.type == EnergyBoundaryType::TotalTemperature) {
             additionalFaceFlux_[face] = diffusivity_[owner] *
                 (mesh_.faces[face].area / mesh_.faces[face].delta *
                     (kineticEnergy_.boundary(face) - kineticEnergy_[owner]) +
@@ -205,7 +230,7 @@ LinearSolveInfo EnergyModel::solve(double dt, bool hasOldOld, const std::vector<
         massFlux, diffusivity_, source_, destruction_, constrainedCells_, constrainedValues_, 1.0, time,
         compressible_ ? 1.0 : relaxation_, linearRelativeTolerance_, linearAbsoluteTolerance_,
         maximumLinearIterations_, config_.get("energy_ksp", "bcgs"), config_.get("energy_pc", "ilu")};
-    equation.barthJespersen = useBarthJespersenLimiter(config_);
+    equation.gradientLimiter = readGradientLimiter(config_);
     equation.secondOrderConvection = config_.boolean("energy_second_order", true);
     equation.additionalFaceFlux = compressible_ ? &additionalFaceFlux_ : nullptr;
     equation.densityField = &density;

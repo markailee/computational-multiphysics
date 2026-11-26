@@ -70,7 +70,8 @@ private:
     void updateBoundaries();
     void readRestart(const std::filesystem::path& file);
     void updateMaterialProperties();
-    double faceDensity(std::size_t faceIndex) const;
+    double boundaryDensity(std::size_t faceIndex) const;
+    double totalInletCoefficient(std::size_t faceIndex) const;
     void computeMassFlux(bool rhieChow);
     std::array<LinearSolveInfo, 2> solveMomentum(double dt);
     LinearSolveInfo correctPressure(double dt);
@@ -92,9 +93,10 @@ private:
     std::shared_ptr<MaterialModel> material_;
     double density_;
     double viscosity_;
+    double gasConstant_;
     double velocityRelaxation_;
     double pressureRelaxation_;
-    bool barthJespersenLimiter_;
+    GradientLimiter gradientLimiter_;
     double outerTolerance_;
     double continuityTolerance_;
     double linearRelativeTolerance_;
@@ -119,6 +121,7 @@ private:
     ScalarField oldPressure_;
     ScalarField oldOldPressure_;
     std::vector<double> massFlux_;
+    std::vector<double> faceDensityField_;
     std::vector<double> densityField_;
     std::vector<double> previousDensityField_;
     std::vector<double> oldDensityField_;

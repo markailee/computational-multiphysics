@@ -5,8 +5,8 @@
 
 namespace mp {
 
-enum class VelocityBoundaryType { FixedValue, NoSlip, ZeroGradient, Slip, ParabolicX };
-enum class PressureBoundaryType { FixedValue, ZeroGradient };
+enum class VelocityBoundaryType { FixedValue, NoSlip, ZeroGradient, Slip, ParabolicX, Direction };
+enum class PressureBoundaryType { FixedValue, ZeroGradient, TotalPressure };
 
 struct PatchBoundaryCondition {
     VelocityBoundaryType velocityType = VelocityBoundaryType::NoSlip;
@@ -26,6 +26,10 @@ public:
     double pressure(std::size_t faceIndex, double cellPressure) const;
     bool fixedVelocity(std::size_t faceIndex) const;
     bool fixedPressure(std::size_t faceIndex) const;
+    bool totalPressure(std::size_t faceIndex) const;
+    double totalPressureValue(std::size_t faceIndex) const;
+    bool hasInflowDirection(std::size_t faceIndex) const;
+    Vector2 inflowDirection(std::size_t faceIndex) const;
     bool noSlip(std::size_t faceIndex) const;
     bool slip(std::size_t faceIndex) const;
     bool hasFixedPressure() const;

@@ -32,6 +32,14 @@ FlowBoundaryConditions::FlowBoundaryConditions(const Mesh& mesh, const Config& c
         } else if (type == "parabolic" || type == "parabolicx") {
             condition.velocityType = VelocityBoundaryType::ParabolicX;
             velocity >> condition.meanVelocity;
+        } else if (type == "direction" || type == "flowdirection" || type == "inletdirection") {
+            condition.velocityType = VelocityBoundaryType::Direction;
+            velocity >> condition.velocity;
+            const double length = norm(condition.velocity);
+            if (!(length > 0.0)) {
+                throw std::runtime_error("Flow direction vector must be non-zero on patch " + patch.name);
+            }
+            condition.velocity /= length;
         } else {
             throw std::runtime_error("Unknown velocity boundary condition on patch " + patch.name);
         }
@@ -43,6 +51,14 @@ FlowBoundaryConditions::FlowBoundaryConditions(const Mesh& mesh, const Config& c
         if (pressureName == "fixedvalue") {
             condition.pressureType = PressureBoundaryType::FixedValue;
             pressure >> condition.pressure;
+            hasFixedPressure_ = true;
+        } else if (pressureName == "totalpressure" || pressureName == "stagnationpressure" ||
+                   pressureName == "total" || pressureName == "stagnation") {
+            condition.pressureType = PressureBoundaryType::TotalPressure;
+            pressure >> condition.pressure;
+            if (!(condition.pressure > 0.0)) {
+                throw std::runtime_error("Total pressure must be positive on patch " + patch.name);
+            }
             hasFixedPressure_ = true;
         } else if (pressureName == "zerogradient") {
             condition.pressureType = PressureBoundaryType::ZeroGradient;
@@ -83,6 +99,8 @@ Vector2 FlowBoundaryConditions::velocity(std::size_t faceIndex, const Vector2& c
         const double eta = (face.centre.y - condition.minimumY) / (condition.maximumY - condition.minimumY);
         return {6.0 * condition.meanVelocity * eta * (1.0 - eta), 0.0};
     }
+    case VelocityBoundaryType::Direction:
+        return condition.velocity * std::max(0.0, dot(cellVelocity, condition.velocity));
     }
     return {};
 }
@@ -101,6 +119,22 @@ bool FlowBoundaryConditions::fixedVelocity(std::size_t faceIndex) const {
 
 bool FlowBoundaryConditions::fixedPressure(std::size_t faceIndex) const {
     return conditions_[mesh_->faces[faceIndex].patch].pressureType == PressureBoundaryType::FixedValue;
+}
+
+bool FlowBoundaryConditions::totalPressure(std::size_t faceIndex) const {
+    return conditions_[mesh_->faces[faceIndex].patch].pressureType == PressureBoundaryType::TotalPressure;
+}
+
+double FlowBoundaryConditions::totalPressureValue(std::size_t faceIndex) const {
+    return conditions_[mesh_->faces[faceIndex].patch].pressure;
+}
+
+bool FlowBoundaryConditions::hasInflowDirection(std::size_t faceIndex) const {
+    return conditions_[mesh_->faces[faceIndex].patch].velocityType == VelocityBoundaryType::Direction;
+}
+
+Vector2 FlowBoundaryConditions::inflowDirection(std::size_t faceIndex) const {
+    return conditions_[mesh_->faces[faceIndex].patch].velocity;
 }
 
 bool FlowBoundaryConditions::noSlip(std::size_t faceIndex) const {

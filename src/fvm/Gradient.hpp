@@ -32,7 +32,16 @@ public:
     std::vector<VectorGradient> vector(const VectorField& field) const override;
 };
 
+enum class GradientLimiter { None, BarthJespersen, Venkatakrishnan };
+
+GradientLimiter readGradientLimiter(const Config& config);
 bool useBarthJespersenLimiter(const Config& config);
+std::vector<ScalarGradient> applyGradientLimiter(const ScalarField& field,
+                                                 std::vector<ScalarGradient> gradients,
+                                                 GradientLimiter limiter);
+std::vector<VectorGradient> applyGradientLimiter(const VectorField& field,
+                                                 std::vector<VectorGradient> gradients,
+                                                 GradientLimiter limiter);
 std::vector<ScalarGradient> applyBarthJespersenLimiter(const ScalarField& field,
                                                        std::vector<ScalarGradient> gradients);
 std::vector<VectorGradient> applyBarthJespersenLimiter(const VectorField& field,
