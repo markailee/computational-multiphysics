@@ -1,0 +1,37 @@
+physics = neutron
+neutron_model = sn
+problem_type = eigenvalue
+mesh = mesh/quad_16.msh
+output = results/sn_critical.plt
+
+energy_groups = 1
+materials = medium
+sn_polar = 2
+sn_azimuth = 4
+initial_flux = 1.0
+maximum_iterations = 100
+maximum_source_iterations = 100
+tolerance = 1.0e-11
+eigen_tolerance = 1.0e-12
+source_tolerance = 1.0e-12
+balance_tolerance = 1.0e-9
+linear_tolerance = 1.0e-12
+linear_absolute_tolerance = 1.0e-14
+
+[material.medium]
+sigma_total = 2.0
+sigma_absorption = 1.0
+sigma_fission = 0.2
+nu = 6.0
+chi = 1.0
+scattering = 1.0
+energy_release = 3.0
+
+[boundary.left]
+neutron = reflective
+[boundary.right]
+neutron = reflective
+[boundary.bottom]
+neutron = reflective
+[boundary.top]
+neutron = reflective

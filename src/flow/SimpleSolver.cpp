@@ -284,7 +284,7 @@ void SimpleSolver::computeMassFlux(bool rhieChow) {
     }
 }
 
-LinearSolveInfo SimpleSolver::solveMomentum(double dt) {
+std::array<LinearSolveInfo, 2> SimpleSolver::solveMomentum(double dt) {
     const auto velocityGradient = gradient_->vector(velocity_);
     std::vector<VectorGradient> limitedVelocityGradient;
     const std::vector<VectorGradient>* convectionGradient = &velocityGradient;
@@ -432,7 +432,7 @@ LinearSolveInfo SimpleSolver::solveMomentum(double dt) {
     for (int cell = 0; cell < cellCount; ++cell) velocity_[cell] = {solutionX[cell], solutionY[cell]};
     updateBoundaries();
     computeMassFlux(true);
-    return {infoX.iterations + infoY.iterations, std::max(infoX.residual, infoY.residual)};
+    return {infoX, infoY};
 }
 
 LinearSolveInfo SimpleSolver::correctPressure(double dt) {
@@ -577,7 +577,7 @@ FlowDiagnostics SimpleSolver::solveStep(double dt, int maximumIterations) {
         if (turbulence_) turbulence_->beginIteration();
         if (multiSpecies_) multiSpecies_->beginIteration();
         if (multiphase_) multiphase_->beginOuterIteration();
-        const LinearSolveInfo momentum = solveMomentum(dt);
+        const std::array<LinearSolveInfo, 2> momentum = solveMomentum(dt);
         const LinearSolveInfo pressure = correctPressure(dt);
         if (multiphase_) {
             MultiphaseContext context{mesh_, velocity_, pressure_, massFlux_, densityField_, viscosityField_,
@@ -609,7 +609,7 @@ FlowDiagnostics SimpleSolver::solveStep(double dt, int maximumIterations) {
         }
         lastImbalance_ = imbalance;
         diagnostics.iterations = iteration;
-        diagnostics.momentumLinearIterations = momentum.iterations;
+        diagnostics.momentumLinearIterations = momentum[0].iterations + momentum[1].iterations;
         diagnostics.pressureLinearIterations = pressure.iterations;
         diagnostics.turbulenceChange = turbulence_ ? turbulence_->change() : 0.0;
         diagnostics.turbulenceLinearIterations = turbulence_ ? turbulence_->linearIterations() : 0;
@@ -643,15 +643,23 @@ FlowDiagnostics SimpleSolver::solveStep(double dt, int maximumIterations) {
             (flowModel_ != FlowModel::Compressible || diagnostics.densityChange < densityTolerance);
         if (iteration == 1 || iteration % logInterval == 0 || diagnostics.converged || iteration == maximumIterations) {
             std::cout << (timeDerivative_.isSteady() ? "SIMPLE " : "  outer ")
-                      << std::setw(6) << iteration << "  dU=" << std::scientific << diagnostics.velocityChange
-                      << "  dp=" << diagnostics.pressureChange << "  dTurb=" << diagnostics.turbulenceChange
-                      << "  continuity=" << diagnostics.maxCellImbalance;
+                      << std::setw(6) << iteration << std::scientific
+                      << "residuals:" 
+                      << momentum[0].residual
+                      << "," << momentum[1].residual
+                      << "," << pressure.residual;
             if (energy_) {
-                std::cout << "  dTemp=" << diagnostics.temperatureChange << "  drho=" << diagnostics.densityChange
-                          << "  Tlimit=" << energy_->temperatureLimited();
+                std::cout << "," << energyInfo.residual;
+            }
+            if (turbulence_) {
+                std::cout << "," << turbulence_->kLinearResidual();
             }
             if (multiSpecies_) {
-                std::cout << "  dY=" << diagnostics.speciesChange << "  Ysum=" << diagnostics.speciesCompositionError;
+                const std::vector<double>& residuals = multiSpecies_->linearResiduals();
+                for (std::size_t species = 0; species < residuals.size(); ++species) {
+                    std::cout << "  " << multiSpecies_->massFraction(species).name() << "=" << residuals[species];
+                }
+                std::cout << "  Ysum=" << diagnostics.speciesCompositionError;
             }
             std::cout << "  linear=" << diagnostics.momentumLinearIterations + diagnostics.pressureLinearIterations +
                          diagnostics.turbulenceLinearIterations + diagnostics.speciesLinearIterations +

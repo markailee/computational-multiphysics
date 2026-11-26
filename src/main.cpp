@@ -1,5 +1,6 @@
 #include "acoustic/AcousticSolver.hpp"
 #include "flow/SimpleSolver.hpp"
+#include "neutron/NeutronSolver.hpp"
 #include "mesh/GmshReader.hpp"
 
 #include <petsc.h>
@@ -30,6 +31,9 @@ int main(int argc, char** argv) {
         const std::string physics = mp::lowercase(config.get("physics", "flow"));
         if (physics == "acoustic") {
             mp::AcousticSolver solver(mesh, config, caseDirectory);
+            solver.run();
+        } else if (physics == "neutron" || physics == "neutronics") {
+            mp::NeutronSolver solver(mesh, config, caseDirectory);
             solver.run();
         } else if (physics == "flow" || physics == "incompressible") {
             mp::SimpleSolver solver(mesh, config, caseDirectory);

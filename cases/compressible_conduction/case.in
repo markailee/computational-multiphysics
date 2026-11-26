@@ -14,7 +14,7 @@ initial_temperature = 300
 viscous_dissipation = false
 
 gradient = least_squares
-velocity_relaxation = 0.5
+velocity_relaxation = 0.7
 pressure_relaxation = 0.3
 energy_relaxation = 1.0
 maximum_iterations = 1000

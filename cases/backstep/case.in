@@ -6,8 +6,8 @@ density = 1.0
 viscosity = 0.005
 gradient = least_squares
 
-velocity_relaxation = 0.5
-pressure_relaxation = 0.2
+velocity_relaxation = 0.7
+pressure_relaxation = 0.3
 maximum_iterations = 4000
 tolerance = 2.0e-6
 continuity_tolerance = 1.0e-8

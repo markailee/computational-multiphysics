@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="500" viewBox="0 0 900 500">
+<rect width="100%" height="100%" fill="white"/>
+<text x="450.0" y="28" text-anchor="middle" font-family="sans-serif" font-size="19">2D two-group diffusion eigenmode</text>
+<line x1="85.00" y1="55" x2="85.00" y2="435" stroke="#e5e5e5"/>
+<line x1="85" y1="435.00" x2="870" y2="435.00" stroke="#e5e5e5"/>
+<text x="85.00" y="455" text-anchor="middle" font-family="sans-serif" font-size="11">0.0156</text>
+<text x="77" y="439.00" text-anchor="end" font-family="sans-serif" font-size="11">-0.094</text>
+<line x1="242.00" y1="55" x2="242.00" y2="435" stroke="#e5e5e5"/>
+<line x1="85" y1="359.00" x2="870" y2="359.00" stroke="#e5e5e5"/>
+<text x="242.00" y="455" text-anchor="middle" font-family="sans-serif" font-size="11">0.209</text>
+<text x="77" y="363.00" text-anchor="end" font-family="sans-serif" font-size="11">0.289</text>
+<line x1="399.00" y1="55" x2="399.00" y2="435" stroke="#e5e5e5"/>
+<line x1="85" y1="283.00" x2="870" y2="283.00" stroke="#e5e5e5"/>
+<text x="399.00" y="455" text-anchor="middle" font-family="sans-serif" font-size="11">0.403</text>
+<text x="77" y="287.00" text-anchor="end" font-family="sans-serif" font-size="11">0.671</text>
+<line x1="556.00" y1="55" x2="556.00" y2="435" stroke="#e5e5e5"/>
+<line x1="85" y1="207.00" x2="870" y2="207.00" stroke="#e5e5e5"/>
+<text x="556.00" y="455" text-anchor="middle" font-family="sans-serif" font-size="11">0.597</text>
+<text x="77" y="211.00" text-anchor="end" font-family="sans-serif" font-size="11">1.05</text>
+<line x1="713.00" y1="55" x2="713.00" y2="435" stroke="#e5e5e5"/>
+<line x1="85" y1="131.00" x2="870" y2="131.00" stroke="#e5e5e5"/>
+<text x="713.00" y="455" text-anchor="middle" font-family="sans-serif" font-size="11">0.791</text>
+<text x="77" y="135.00" text-anchor="end" font-family="sans-serif" font-size="11">1.44</text>
+<line x1="870.00" y1="55" x2="870.00" y2="435" stroke="#e5e5e5"/>
+<line x1="85" y1="55.00" x2="870" y2="55.00" stroke="#e5e5e5"/>
+<text x="870.00" y="455" text-anchor="middle" font-family="sans-serif" font-size="11">0.984</text>
+<text x="77" y="59.00" text-anchor="end" font-family="sans-serif" font-size="11">1.82</text>
+<rect x="85" y="55" width="785" height="380" fill="none" stroke="#333"/>
+<polyline points="85.00,399.87 110.32,367.10 135.65,334.80 160.97,303.29 186.29,272.87 211.61,243.83 236.94,216.46 262.26,191.00 287.58,167.72 312.90,146.83 338.23,128.54 363.55,113.02 388.87,100.42 414.19,90.86 439.52,84.43 464.84,81.21 490.16,81.21 515.48,84.43 540.81,90.86 566.13,100.42 591.45,113.02 616.77,128.54 642.10,146.83 667.42,167.72 692.74,191.00 718.06,216.46 743.39,243.83 768.71,272.87 794.03,303.29 819.35,334.80 844.68,367.10 870.00,399.87" fill="none" stroke="#1764ab" stroke-width="1.8"/>
+<polyline points="85.00,399.87 110.32,367.10 135.65,334.80 160.97,303.29 186.29,272.87 211.61,243.83 236.94,216.46 262.26,191.00 287.58,167.72 312.90,146.83 338.23,128.54 363.55,113.02 388.87,100.42 414.19,90.86 439.52,84.43 464.84,81.21 490.16,81.21 515.48,84.43 540.81,90.86 566.13,100.42 591.45,113.02 616.77,128.54 642.10,146.83 667.42,167.72 692.74,191.00 718.06,216.46 743.39,243.83 768.71,272.87 794.03,303.29 819.35,334.80 844.68,367.10 870.00,399.87" fill="none" stroke="#1764ab" stroke-width="1.8" stroke-dasharray="6 4"/>
+<polyline points="85.00,408.79 110.32,393.79 135.65,379.00 160.97,364.58 186.29,350.65 211.61,337.35 236.94,324.82 262.26,313.17 287.58,302.51 312.90,292.94 338.23,284.57 363.55,277.46 388.87,271.69 414.19,267.31 439.52,264.37 464.84,262.90 490.16,262.90 515.48,264.37 540.81,267.31 566.13,271.69 591.45,277.46 616.77,284.57 642.10,292.94 667.42,302.51 692.74,313.17 718.06,324.82 743.39,337.35 768.71,350.65 794.03,364.58 819.35,379.00 844.68,393.79 870.00,408.79" fill="none" stroke="#2f8f4e" stroke-width="1.8"/>
+<polyline points="85.00,408.79 110.32,393.79 135.65,379.00 160.97,364.58 186.29,350.65 211.61,337.35 236.94,324.82 262.26,313.17 287.58,302.51 312.90,292.94 338.23,284.57 363.55,277.46 388.87,271.69 414.19,267.31 439.52,264.37 464.84,262.90 490.16,262.90 515.48,264.37 540.81,267.31 566.13,271.69 591.45,277.46 616.77,284.57 642.10,292.94 667.42,302.51 692.74,313.17 718.06,324.82 743.39,337.35 768.71,350.65 794.03,364.58 819.35,379.00 844.68,393.79 870.00,408.79" fill="none" stroke="#2f8f4e" stroke-width="1.8" stroke-dasharray="6 4"/>
+<text x="450.0" y="485" text-anchor="middle" font-family="sans-serif" font-size="14">x</text>
+<text x="18" y="250.0" text-anchor="middle" transform="rotate(-90 18 250.0)" font-family="sans-serif" font-size="14">normalized scalar flux</text>
+<line x1="655" y1="75" x2="683" y2="75" stroke="#1764ab" stroke-width="2"/>
+<text x="690" y="79" font-family="sans-serif" font-size="12">group 1 numerical</text>
+<line x1="655" y1="97" x2="683" y2="97" stroke="#1764ab" stroke-width="2"/>
+<text x="690" y="101" font-family="sans-serif" font-size="12">group 1 analytical</text>
+<line x1="655" y1="119" x2="683" y2="119" stroke="#2f8f4e" stroke-width="2"/>
+<text x="690" y="123" font-family="sans-serif" font-size="12">group 2 numerical</text>
+<line x1="655" y1="141" x2="683" y2="141" stroke="#2f8f4e" stroke-width="2"/>
+<text x="690" y="145" font-family="sans-serif" font-size="12">group 2 analytical</text>
+</svg>

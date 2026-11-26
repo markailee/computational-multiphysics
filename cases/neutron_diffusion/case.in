@@ -1,0 +1,33 @@
+physics = neutron
+neutron_model = diffusion
+problem_type = eigenvalue
+mesh = mesh/quad_32.msh
+output = results/diffusion_32.plt
+
+energy_groups = 1
+materials = homogeneous
+initial_flux = 1.0
+maximum_iterations = 100
+tolerance = 1.0e-11
+eigen_tolerance = 1.0e-12
+balance_tolerance = 1.0e-9
+linear_tolerance = 1.0e-12
+linear_absolute_tolerance = 1.0e-14
+
+[material.homogeneous]
+sigma_total = 1.0
+sigma_absorption = 1.0
+sigma_fission = 0.5
+nu = 44.0
+chi = 1.0
+diffusion_coefficient = 1.0
+energy_release = 2.0
+
+[boundary.left]
+neutron = fixed_flux 0.0
+[boundary.right]
+neutron = fixed_flux 0.0
+[boundary.bottom]
+neutron = fixed_flux 0.0
+[boundary.top]
+neutron = fixed_flux 0.0

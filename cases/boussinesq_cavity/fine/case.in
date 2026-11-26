@@ -14,8 +14,8 @@ initial_temperature = 300.5
 gravity = 0 -7100000
 
 gradient = least_squares
-velocity_relaxation = 0.3
-pressure_relaxation = 0.2
+velocity_relaxation = 0.7
+pressure_relaxation = 0.3
 energy_relaxation = 0.5
 maximum_iterations = 3000
 tolerance = 1.0e-4

@@ -60,6 +60,8 @@ public:
     double change() const { return change_; }
     int linearIterations() const { return linearIterations_; }
     double linearResidual() const { return linearResidual_; }
+    double kLinearResidual() const { return kLinearResidual_; }
+    double scaleLinearResidual() const { return scaleLinearResidual_; }
 
 private:
     TurbulenceBoundaryCondition readBoundary(const std::string& patch, const std::string& variable,
@@ -126,6 +128,8 @@ private:
     double change_ = 0.0;
     int linearIterations_ = 0;
     double linearResidual_ = 0.0;
+    double kLinearResidual_ = 0.0;
+    double scaleLinearResidual_ = 0.0;
 };
 
 std::unique_ptr<TurbulenceModel> makeTurbulenceModel(const Mesh& mesh, const Config& config,

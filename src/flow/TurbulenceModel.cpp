@@ -339,6 +339,8 @@ void TurbulenceModel::solveKEpsilon(double dt, bool hasOldOld, const std::vector
     }
     linearIterations_ = kInfo.iterations + epsilonInfo.iterations;
     linearResidual_ = std::max(kInfo.residual, epsilonInfo.residual);
+    kLinearResidual_ = kInfo.residual;
+    scaleLinearResidual_ = epsilonInfo.residual;
 }
 
 void TurbulenceModel::solveSST(double dt, bool hasOldOld, const std::vector<double>& massFlux,
@@ -381,6 +383,8 @@ void TurbulenceModel::solveSST(double dt, bool hasOldOld, const std::vector<doub
     clip(omega_, minimumOmega_);
     linearIterations_ = kInfo.iterations + omegaInfo.iterations;
     linearResidual_ = std::max(kInfo.residual, omegaInfo.residual);
+    kLinearResidual_ = kInfo.residual;
+    scaleLinearResidual_ = omegaInfo.residual;
 }
 
 void TurbulenceModel::solve(double dt, bool hasOldOld, const VectorField& velocity,

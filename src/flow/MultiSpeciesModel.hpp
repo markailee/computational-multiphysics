@@ -41,6 +41,7 @@ public:
     bool bounded(double tolerance) const;
     int linearIterations() const { return linearIterations_; }
     double linearResidual() const { return linearResidual_; }
+    const std::vector<double>& linearResiduals() const { return linearResiduals_; }
 
 private:
     SpeciesBoundaryCondition readBoundary(const std::string& patch) const;
@@ -90,6 +91,7 @@ private:
     double maximumMassFraction_ = 1.0;
     int linearIterations_ = 0;
     double linearResidual_ = 0.0;
+    std::vector<double> linearResiduals_;
     bool initialized_ = false;
 };
 

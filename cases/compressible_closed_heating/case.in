@@ -18,8 +18,8 @@ heat_source = 1000.0
 viscous_dissipation = false
 
 gradient = least_squares
-velocity_relaxation = 0.5
-pressure_relaxation = 0.5
+velocity_relaxation = 0.7
+pressure_relaxation = 0.3
 energy_relaxation = 0.8
 maximum_iterations = 200
 tolerance = 1.0e-9

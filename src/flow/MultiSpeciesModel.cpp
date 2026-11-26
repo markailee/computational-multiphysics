@@ -229,6 +229,7 @@ void MultiSpeciesModel::solve(double dt, bool hasOldOld, const std::vector<doubl
     const TimeCoefficients time = timeDerivative_.coefficients(dt, hasOldOld);
     linearIterations_ = 0;
     linearResidual_ = 0.0;
+    linearResiduals_.clear();
     for (std::size_t k = 0; k + 1 < speciesCount_; ++k) {
         ScalarTransportEquation equation{fields_[k], previousFields_[k], oldFields_[k], oldOldFields_[k],
             massFlux, diffusivities_[k], source_, destruction_, constrainedCells_, constrainedValues_,
@@ -240,6 +241,7 @@ void MultiSpeciesModel::solve(double dt, bool hasOldOld, const std::vector<doubl
         const LinearSolveInfo info = solveScalarTransport(mesh_, gradient, transportSystem_, equation);
         linearIterations_ += info.iterations;
         linearResidual_ = std::max(linearResidual_, info.residual);
+        linearResiduals_.push_back(info.residual);
         for (double value : fields_[k].values()) {
             if (!std::isfinite(value)) throw std::runtime_error("Non-finite value in species field " + fields_[k].name());
         }

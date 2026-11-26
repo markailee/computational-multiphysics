@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="500" viewBox="0 0 900 500">
+<rect width="100%" height="100%" fill="white"/>
+<text x="450.0" y="28" text-anchor="middle" font-family="sans-serif" font-size="19">2D diffusion with Marshak vacuum boundary</text>
+<line x1="85.00" y1="55" x2="85.00" y2="435" stroke="#e5e5e5"/>
+<line x1="85" y1="435.00" x2="870" y2="435.00" stroke="#e5e5e5"/>
+<text x="85.00" y="455" text-anchor="middle" font-family="sans-serif" font-size="11">0.0156</text>
+<text x="77" y="439.00" text-anchor="end" font-family="sans-serif" font-size="11">0.432</text>
+<line x1="242.00" y1="55" x2="242.00" y2="435" stroke="#e5e5e5"/>
+<line x1="85" y1="359.00" x2="870" y2="359.00" stroke="#e5e5e5"/>
+<text x="242.00" y="455" text-anchor="middle" font-family="sans-serif" font-size="11">0.209</text>
+<text x="77" y="363.00" text-anchor="end" font-family="sans-serif" font-size="11">0.551</text>
+<line x1="399.00" y1="55" x2="399.00" y2="435" stroke="#e5e5e5"/>
+<line x1="85" y1="283.00" x2="870" y2="283.00" stroke="#e5e5e5"/>
+<text x="399.00" y="455" text-anchor="middle" font-family="sans-serif" font-size="11">0.403</text>
+<text x="77" y="287.00" text-anchor="end" font-family="sans-serif" font-size="11">0.67</text>
+<line x1="556.00" y1="55" x2="556.00" y2="435" stroke="#e5e5e5"/>
+<line x1="85" y1="207.00" x2="870" y2="207.00" stroke="#e5e5e5"/>
+<text x="556.00" y="455" text-anchor="middle" font-family="sans-serif" font-size="11">0.597</text>
+<text x="77" y="211.00" text-anchor="end" font-family="sans-serif" font-size="11">0.789</text>
+<line x1="713.00" y1="55" x2="713.00" y2="435" stroke="#e5e5e5"/>
+<line x1="85" y1="131.00" x2="870" y2="131.00" stroke="#e5e5e5"/>
+<text x="713.00" y="455" text-anchor="middle" font-family="sans-serif" font-size="11">0.791</text>
+<text x="77" y="135.00" text-anchor="end" font-family="sans-serif" font-size="11">0.908</text>
+<line x1="870.00" y1="55" x2="870.00" y2="435" stroke="#e5e5e5"/>
+<line x1="85" y1="55.00" x2="870" y2="55.00" stroke="#e5e5e5"/>
+<text x="870.00" y="455" text-anchor="middle" font-family="sans-serif" font-size="11">0.984</text>
+<text x="77" y="59.00" text-anchor="end" font-family="sans-serif" font-size="11">1.03</text>
+<rect x="85" y="55" width="785" height="380" fill="none" stroke="#333"/>
+<polyline points="85.00,81.28 110.32,98.90 135.65,115.93 160.97,132.37 186.29,148.25 211.61,163.58 236.94,178.37 262.26,192.64 287.58,206.41 312.90,219.68 338.23,232.48 363.55,244.81 388.87,256.68 414.19,268.11 439.52,279.10 464.84,289.68 490.16,299.84 515.48,309.60 540.81,318.97 566.13,327.96 591.45,336.57 616.77,344.82 642.10,352.71 667.42,360.25 692.74,367.45 718.06,374.31 743.39,380.84 768.71,387.06 794.03,392.95 819.35,398.53 844.68,403.81 870.00,408.79" fill="none" stroke="#1764ab" stroke-width="1.8"/>
+<polyline points="85.00,81.21 110.32,98.83 135.65,115.86 160.97,132.30 186.29,148.18 211.61,163.51 236.94,178.31 262.26,192.58 287.58,206.35 312.90,219.63 338.23,232.42 363.55,244.75 388.87,256.63 414.19,268.06 439.52,279.06 464.84,289.63 490.16,299.80 515.48,309.56 540.81,318.93 566.13,327.92 591.45,336.53 616.77,344.78 642.10,352.67 667.42,360.21 692.74,367.41 718.06,374.27 743.39,380.81 768.71,387.02 794.03,392.91 819.35,398.50 844.68,403.78 870.00,408.76" fill="none" stroke="#c43c39" stroke-width="1.8" stroke-dasharray="6 4"/>
+<text x="450.0" y="485" text-anchor="middle" font-family="sans-serif" font-size="14">x</text>
+<text x="18" y="250.0" text-anchor="middle" transform="rotate(-90 18 250.0)" font-family="sans-serif" font-size="14">scalar flux</text>
+<line x1="655" y1="75" x2="683" y2="75" stroke="#1764ab" stroke-width="2"/>
+<text x="690" y="79" font-family="sans-serif" font-size="12">Numerical</text>
+<line x1="655" y1="97" x2="683" y2="97" stroke="#c43c39" stroke-width="2"/>
+<text x="690" y="101" font-family="sans-serif" font-size="12">Analytical</text>
+</svg>

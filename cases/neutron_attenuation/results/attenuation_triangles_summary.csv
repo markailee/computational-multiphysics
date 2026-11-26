@@ -1,0 +1,2 @@
+problem_type,model,energy_groups,directions,cells,outer_iterations,k_eff,k_balance,reactivity,normalization,volume,flux_integral,flux_min,flux_max,fission_production,absorption,net_leakage,incoming_current,external_source,fission_power,balance_absolute,balance_relative,total_linear_iterations,linear_residual
+fixed_source,neutron-sn,1,8,512,2,,,,fixed_source,1,1.802617510737287,0.9338461022336227,3.082602012874024,0,1.802617510737287,-1.802617510737292,2.565099660323729,0,0,5.10702591327572e-15,1.990965884199285e-15,34,1.244352298449204e-14

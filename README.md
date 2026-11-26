@@ -1,12 +1,12 @@
 # 2D Multiphysics Finite-Volume Solver
 
-A C++17 finite-volume project for two-dimensional multiphysics calculations on unstructured meshes. The executable implements **incompressible, Boussinesq thermal-dilation, and ideal-gas compressible Navier–Stokes solvers** using cell-centered SIMPLE pressure–velocity coupling and a **linear acoustic solver** using the node-centered dual-control-volume formulation of `textbook/Chap5-4-acoustic.md`. The mesh, discretization, linear-algebra, and output components are shared foundations for further physics modules.
+A C++17 finite-volume project for two-dimensional multiphysics calculations on unstructured meshes. The executable implements **incompressible, Boussinesq thermal-dilation, and ideal-gas compressible Navier–Stokes solvers** using cell-centered SIMPLE pressure–velocity coupling, a **linear acoustic solver** using the node-centered dual-control-volume formulation of `textbook/Chap5-4-acoustic.md`, and **steady multigroup neutron transport/diffusion solvers** using the cell-centered formulation of `textbook/Chap5-5-neutron.md`. The mesh, discretization, linear-algebra, and output components are shared foundations for further physics modules.
 
 The primary purpose of this solver is to support **course teaching for computational multiphysics**. It is also intended for numerical-method development. It emphasizes conservative face fluxes, explicit mesh connectivity, readable operator implementations, and reproducible benchmark cases.
 
 **Copyright:** © Wanai Li, Sino-French Institute of Nuclear Engineering and Technology, Sun Yat-Sen University. All rights reserved.
 
-> **Current scope:** serial two-dimensional incompressible/Boussinesq flow, single-component laminar ideal-gas compressible flow, passive inert multispecies transport, and linear acoustics are implemented as separate physics modules, with one-way Curle-type flow-to-acoustic source coupling for the cylinder aeolian-tone case. Flow and species use cell-centered fields; acoustics uses nodal fields on median-dual control areas. Composition-driven variable-density flow, reactions, real-gas models, compressible turbulence, elasticity, two-way fluid–structure/acoustic coupling, non-uniform acoustic media, MPI-distributed calculations, and the VOF/DPM/Euler–Euler solve routines remain future work.
+> **Current scope:** serial two-dimensional incompressible/Boussinesq flow, single-component laminar ideal-gas compressible flow, passive inert multispecies transport, linear acoustics, and steady multigroup \(S_N\)/diffusion neutronics are implemented as separate physics modules, with one-way Curle-type flow-to-acoustic source coupling for the cylinder aeolian-tone case. Flow, species, and neutronics use cell-centered fields; acoustics uses nodal fields on median-dual control areas. Composition-driven variable-density flow, reactions, real-gas models, compressible turbulence, elasticity, two-way fluid–structure/acoustic coupling, non-uniform acoustic media, transient/anisotropic-scattering neutronics, MPI-distributed calculations, and the VOF/DPM/Euler–Euler solve routines remain future work.
 
 ## Contents
 
@@ -19,6 +19,7 @@ The primary purpose of this solver is to support **course teaching for computati
 - [Boundary conditions](#boundary-conditions)
 - [Material and multispecies configuration](#material-and-multispecies-configuration)
 - [Acoustic configuration](#acoustic-configuration)
+- [Neutron configuration](#neutron-configuration)
 - [Gmsh meshes](#gmsh-meshes)
 - [Output files](#output-files)
 - [Validation cases](#validation-cases)
@@ -98,6 +99,19 @@ The code under `src/acoustic/` implements the formulation of `textbook/Chap5-4-a
 - Newmark and centered three-level time integration with consistent initial acceleration.
 - PETSc solves for non-diagonal systems and direct nodal updates for diagonal centered-difference systems.
 - Nodal Tecplot pressure/output rates, per-step summaries, probe histories, and geometry checks.
+
+### Neutron transport and diffusion solvers
+
+The code under `src/neutron/` implements the steady multigroup formulation of `textbook/Chap5-5-neutron.md`:
+
+- Cell-centered conservative \(S_N\) transport with first-order upwind angular fluxes and isotropic scattering/fission sources.
+- Multigroup diffusion with removal and group-to-group scattering, plus harmonic diffusion conductance at material interfaces.
+- Product Gauss–Legendre polar and uniform azimuthal quadrature on the full unit sphere, with exact reflection pairing for x/y-aligned boundaries.
+- Vacuum and incident angular flux, specular/albedo reflection, scalar Dirichlet, zero-current, Marshak, incident-current, and albedo/Robin boundaries.
+- Fixed-source iteration and fission-source-normalized power iteration for \(k_{\mathrm{eff}}\), using PETSc GMRES/ILU by default.
+- Independent absorption, fission production, leakage, and fission-power balances, including \(P_f/k_{\mathrm{eff}}=A+L\) for eigenvalue problems.
+- Mean-flux or target-power normalization, group scalar fluxes and currents, material-wise reaction rates, Tecplot fields, cell CSV data, iteration history, and summary output.
+- Analytical 2D attenuation, uniform \(S_N\) criticality, one-/two-group diffusion eigenmode, and Marshak validation cases on triangle and quadrilateral meshes.
 
 ## Numerical formulation
 
@@ -324,10 +338,12 @@ Turbulence lower bounds default to `minimum_k = 1e-12`, `minimum_epsilon = 1e-12
 │   │   ├── MultiSpeciesModel.* Species fields, transport, flux closure, and diagnostics
 │   │   ├── multiphase/        VOF, ASM, Euler–Euler, DPM interfaces (not implemented)
 │   │   └── SimpleSolver.*      SIMPLE, Rhie–Chow, RANS, and optional module scheduling
-│   └── acoustic/
-│       ├── AcousticBoundaryConditions.* Acoustic patch parsing
-│       ├── AcousticSolver.*    Nodal dual-volume operators and time integration
-│       └── IMPLEMENTATION_PLAN.md Numerical implementation and verification plan
+│   ├── acoustic/
+│   │   ├── AcousticBoundaryConditions.* Acoustic patch parsing
+│   │   ├── AcousticSolver.*    Nodal dual-volume operators and time integration
+│   │   └── IMPLEMENTATION_PLAN.md Numerical implementation and verification plan
+│   └── neutron/
+│       └── NeutronSolver.*     Multigroup SN/diffusion discretization, iteration, and diagnostics
 ├── cases/
 │   ├── generate_meshes.py      Reproducible supplied Gmsh meshes
 │   ├── validate.py             Laminar conservation and benchmark checks
@@ -338,6 +354,9 @@ Turbulence lower bounds default to `minimum_k = 1e-12`, `minimum_epsilon = 1e-12
 │   ├── validate_multispecies.py Species analytical/property checks and grid refinement
 │   ├── generate_thermal_meshes.py Structured thermal-cavity, nozzle, and bump meshes
 │   ├── validate_thermal_compressible.py Boussinesq/compressible analytical validation
+│   ├── generate_neutron_meshes.py Structured neutron-verification meshes
+│   ├── validate_neutron.py     SN/diffusion analytical and conservation validation
+│   ├── neutron_*/              Attenuation, criticality, diffusion, and Marshak cases
 │   ├── boussinesq_cavity/      de Vahl Davis natural-convection grids
 │   ├── compressible_conduction/ Zero-flow ideal-gas conduction
 │   ├── compressible_closed_heating/ Transient constant-mass heating
@@ -452,6 +471,11 @@ Pass either a case directory or the full path to a `case.in` file:
 ./multiphysics cases/acoustic_plane_wave
 ./multiphysics cases/acoustic_convected
 ./multiphysics cases/acoustic_absorbing
+./multiphysics cases/neutron_attenuation
+./multiphysics cases/neutron_sn_critical
+./multiphysics cases/neutron_diffusion
+./multiphysics cases/neutron_diffusion_two_group
+./multiphysics cases/neutron_diffusion_marshak
 ```
 
 Mesh and output paths in `case.in` are resolved relative to that case directory, not relative to the shell's working directory.
@@ -470,6 +494,7 @@ Run the solver directly, without `mpirun`; the current implementation intentiona
 | `make validate-multispecies` | Run ten species/property cases, check analytical errors, grid order, conservation, and generate metrics and SVG plots. |
 | `make validate-thermal` | Run the thermal and nozzle cases plus subsonic, transonic, and supersonic bump flows. |
 | `make validate-bump` | Run the three compressible-SIMPLE circular-arc bump regimes and reference comparisons. |
+| `make validate-neutron` | Run eight analytical/conservation neutronics cases and generate metrics, a report, and SVG distribution plots. |
 | `make cylinder-aeolian` | Run transient `Re = 150` cylinder flow, construct a Curle dipole from its force history, propagate the sound, and plot the results. |
 | `make clean` | Remove the executable and `build/`. It does not remove case results or `validation/`. |
 
@@ -487,7 +512,7 @@ pressure = zeroGradient
 
 | Setting | Default | Meaning |
 |---|---:|---|
-| `physics` | `flow` | `flow` for cell-centered SIMPLE or `acoustic` for the nodal acoustic solver. |
+| `physics` | `flow` | `flow` for cell-centered SIMPLE, `acoustic` for the nodal acoustic solver, or `neutron` for the cell-centered neutronics solver. |
 | `flow_model` | `incompressible` | `incompressible`, `boussinesq`, or `compressible` (pressure-based ideal-gas SIMPLE). |
 | `mesh` | required | Gmsh file, relative to the case directory unless absolute. |
 | `output` | `results/flow.plt` | Tecplot output path. |
@@ -821,6 +846,99 @@ pressure = rigid
 
 Acoustic Tecplot zones contain nodal `p`, `p_t`, `p_tt`, and `dual_area`. Each run also writes `<stem>_summary.csv` with pressure extrema, quadratic energy, linear diagnostics, and Courant number, plus `<stem>_geometry.csv` with element area closure and `sum(grad N)` checks.
 
+## Neutron configuration
+
+Select the steady cell-centered neutronics solver with `physics = neutron`. The governing equations and FVM coefficients are derived in `textbook/Chap5-5-neutron.md`.
+
+### Main neutron settings
+
+| Setting | Default | Meaning |
+|---|---:|---|
+| `neutron_model` | `sn` | `sn`/`transport` for discrete ordinates or `diffusion` for multigroup diffusion. |
+| `problem_type` | `eigenvalue` | `eigenvalue` for \(k_{\mathrm{eff}}\) or `fixed_source`. |
+| `energy_groups` | `1` | Number of neutron energy groups. |
+| `sn_polar` | `2` | Even Gauss–Legendre polar order, at least 2. |
+| `sn_azimuth` | `4` | Uniform azimuthal direction count; must be a multiple of 4. |
+| `initial_flux` | `1.0` | Initial scalar flux; angular flux starts isotropically. Eigenvalue problems require a positive value. |
+| `target_power` | `0.0` | If positive, normalize an eigenvalue solution to this total fission power; otherwise normalize its mean total scalar flux to one. |
+| `maximum_iterations` | `100` | Maximum fixed-source or power iterations. |
+| `maximum_source_iterations` | `100` | Maximum scattering/source iterations per \(S_N\) outer solve. |
+| `tolerance` | `1e-8` | Normalized flux-shape convergence tolerance. |
+| `eigen_tolerance` | `1e-10` | Relative \(k_{\mathrm{eff}}\) update tolerance. |
+| `source_tolerance` | `1e-9` | Inner \(S_N\) scattering-source tolerance. |
+| `balance_tolerance` | `1e-8` | Independent particle-balance and reaction-rate eigenvalue tolerance. |
+| `linear_solver`, `preconditioner` | `gmres`, `ilu` | PETSc KSP and preconditioner used for every angular or multigroup system. |
+| `linear_tolerance` | `1e-10` | PETSc relative residual tolerance. |
+| `linear_absolute_tolerance` | `1e-12` | PETSc absolute residual tolerance. |
+| `maximum_linear_iterations` | `1000` | Maximum iterations per PETSc solve. |
+| `log_interval` | `1` | Console-output interval for outer iterations. |
+
+### Materials and regions
+
+Define one or more named materials. Values can be a scalar replicated over groups or a space-separated list with `energy_groups` entries. Cross sections and diffusion coefficients must use consistent units; the solver does not convert cm, m, barn, or energy-release units.
+
+```ini
+energy_groups = 2
+materials = fuel reflector
+default_material = reflector
+regions = fuel_block
+
+[material.fuel]
+sigma_total = 1.2 2.0
+sigma_absorption = 1.0 2.0
+sigma_fission = 0.5 1.0
+nu = 16.0 40.0
+chi = 0.8 0.2
+scattering = 0.0 0.0 0.2 0.0
+diffusion_coefficient = 1.0 0.5
+energy_release = 2.0 2.0
+external_source = 0.0 0.0
+
+[material.reflector]
+sigma_total = 1.0 1.5
+sigma_absorption = 0.2 0.4
+scattering = 0.7 0.0 0.1 1.0
+diffusion_coefficient = 0.4 0.3
+
+[region.fuel_block]
+material = fuel
+bounds = 0.0 1.0 0.0 1.0
+```
+
+- `sigma_total` is required and must be positive. `sigma_absorption` can be omitted and is then computed as total minus outgoing scattering. If supplied, the code requires \(\Sigma_t=\Sigma_a+\sum_{g'}\Sigma_{s,g\to g'}\).
+- `scattering` is a row-major \(G\times G\) matrix with destination groups as rows and source groups as columns: entry `g * G + source` is \(\Sigma_{s,\mathrm{source}\to g}\). In the example, `0.2` is downscatter from group 1 to group 2.
+- `sigma_fission` is optional. Every fissile material requires `nu`; production uses \(\nu\Sigma_f\). `chi` is normalized to sum to one and defaults to the first group if omitted.
+- `diffusion_coefficient` is optional and defaults to \(1/(3\Sigma_t)\) for isotropic scattering. It is used only by the diffusion model.
+- `energy_release` is optional and defaults to one per fission. Power uses `energy_release * sigma_fission * phi`; alternatively interpret the resulting values as normalized rather than SI watts.
+- `external_source` is the isotropic volume-integrated source \(Q_g\); the angular equation receives \(Q_g/(4\pi)\).
+- Each `regions` entry assigns one material to cells whose centres lie in `bounds = xmin xmax ymin ymax`. Later regions override earlier ones; unassigned cells use `default_material`. Material interfaces should align with mesh faces.
+
+### Neutron boundaries
+
+Every physical patch needs a `neutron` entry:
+
+| Syntax | \(S_N\) transport | Diffusion |
+|---|---|---|
+| `neutron = vacuum` | Zero incoming angular flux. | Marshak vacuum with \(\gamma=1/2\). |
+| `neutron = reflective` | Specular reflection with exact ordinate pairing on x/y-aligned boundaries. | Zero normal current. |
+| `neutron = albedo beta` | Specular return scaled by `beta`. | \(J_n=\gamma\phi\), \(\gamma=(1-\beta)/[2(1+\beta)]\). |
+| `neutron = incident_flux value` | Non-negative isotropic incoming angular flux for all groups. | Not available. |
+| `neutron = fixed_flux value` | Not available. | Scalar Dirichlet flux. |
+| `neutron = incident_current value` | Not available. | Non-negative prescribed incoming partial current. |
+| `neutron = marshak gamma` | Not available. | Robin current \(J_n=\gamma\phi\); `gamma` defaults to `0.5`. |
+| `neutron = zero_current` | Use `reflective` instead. | Zero normal current. |
+
+### Neutron output
+
+Each run writes the configured Tecplot file and these companions using the same stem:
+
+- `_cells.csv`: cell centres, material, group and total scalar flux, current components, absorption, fission rate, neutron production, and power density.
+- `_summary.csv`: model, iteration count, \(k_{\mathrm{eff}}\), balance-based \(k\), reactivity, normalization, flux extrema/integral, production, absorption, net leakage, incoming current, external source, fission power, particle-balance residual, and PETSc diagnostics.
+- `_history.csv`: outer iteration, eigenvalue, normalized flux change, balance residual, source iterations, and linear iterations.
+- `_directions.csv`: \(S_N\) direction cosines and angular weights.
+
+Tecplot fields include `phi_g1`, ..., `phi_total`, `current_x/current_y`, `absorption_rate`, `fission_rate`, `neutron_production`, `power_density`, and `material_index`. Eigenvalue output is normalized to unit mean total flux unless `target_power` is specified; fixed-source output retains its physical source-based magnitude. The implementation is currently steady and isotropic-scattering only, with first-order \(S_N\) upwinding and two-point diffusion on essentially orthogonal meshes.
+
 ## Gmsh meshes
 
 ### Supported input
@@ -914,7 +1032,7 @@ Run the complete workflow:
 make validate
 ```
 
-This runs the three laminar regressions, all twelve plate/elbow turbulence cases, the analytical acoustic matrix, the ten multispecies/material cases, and the eight thermal/compressible cases. `cases/validate.py` checks the laminar cases; `cases/validate_turbulence.py --run` executes the turbulence matrix and writes `validation/metrics.csv`, comparison CSVs, and SVG plots. The detailed model-validation reports are under `validation/`.
+This runs the three laminar regressions, all twelve plate/elbow turbulence cases, the analytical acoustic matrix, the ten multispecies/material cases, the eight thermal/compressible cases, and the eight neutronics verification cases. `cases/validate.py` checks the laminar cases; `cases/validate_turbulence.py --run` executes the turbulence matrix and writes `validation/metrics.csv`, comparison CSVs, and SVG plots. The detailed model-validation reports are under `validation/`.
 
 ### Current results
 
@@ -989,6 +1107,20 @@ The finest-grid relative L2 errors are approximately `3.41e-5` for Stefan diffus
 
 `make cylinder-aeolian` runs the hybrid case under `cases/cylinder_aeolian/`: transient `Re = 150` flow, force-history extraction over three measured shedding periods, and acoustic propagation at `M = 0.2`. The workflow compares `St`, mean `Cd`, lift amplitude, and drag second harmonic with Inoue and Hatakeyama's published values and checks transverse-dipole directivity. Case equations, source conventions, commands, and limitations are in `cases/cylinder_aeolian/README.md`; final metrics and figures are described in `validation/cylinder_aeolian.md`.
 
+### Neutron analytical and conservation validation
+
+`make validate-neutron` runs eight 2D cases covering pure-absorption \(S_N\) attenuation on quadrilateral and triangle grids, uniform reflective \(S_N\) criticality, one-group diffusion at two grid levels, two-group downscatter diffusion, and fixed-source Marshak diffusion. The validator checks scalar-flux distributions, discrete and continuous eigenvalue references, fission production/absorption/leakage balances, and refinement trends. It writes `validation/neutron_metrics.csv`, `validation/neutron_validation.md`, and four SVG distribution plots.
+
+| Case | Computed result | Reference/check |
+|---|---|---|
+| Reflective \(S_N\) criticality | \(k_{\mathrm{eff}}=1.2000000000\) | Exact \(k=\nu\Sigma_f/\Sigma_a=1.2\); uniform flux and zero net leakage |
+| One-group diffusion, 16×16 | \(k_{\mathrm{eff}}=1.0640421394\) | Discrete reference `1.064042139426`; distribution L2 `1.01e-13` |
+| One-group diffusion, 32×32 | \(k_{\mathrm{eff}}=1.0616039328\) | Discrete reference `1.061603932808`; continuous reference `1.060792637262` |
+| Two-group diffusion, 32×32 | \(k_{\mathrm{eff}}=1.0061060454\) | Discrete reference `1.006106045418`; distribution L2 `1.87e-13` |
+| 64×8 attenuation / 32×8 Marshak diffusion | Relative L2 `6.51e-3` / `1.15e-4` | Analytical attenuation / Marshak profiles |
+
+The one-group continuous-eigenvalue refinement order is `2.0019`; attenuation L2 refinement order is `1.9458`. All final particle-balance relative residuals are below `3e-12`. These are analytical verification cases, not full IAEA/C5G7 production-benchmark certifications; see [`validation/neutron_validation.md`](validation/neutron_validation.md) for the complete metrics and plot links.
+
 ## Adding a new case
 
 1. Create a directory under `cases/`.
@@ -1030,7 +1162,7 @@ public:
 };
 ```
 
-`src/main.cpp` selects `SimpleSolver` or `AcousticSolver` from `physics` in `case.in`. Inter-solver field exchange and coupled scheduling still need to be added before this becomes a coupled multiphysics executable.
+`src/main.cpp` selects `SimpleSolver`, `AcousticSolver`, or `NeutronSolver` from `physics` in `case.in`. Inter-solver field exchange and coupled scheduling still need to be added before this becomes a coupled multiphysics executable.
 
 ## Current limitations
 
@@ -1045,6 +1177,7 @@ public:
 - No elastic field solver, fluid–structure coupling, or two-way fluid–acoustic coupling yet. The cylinder case is one-way Curle-type coupling.
 - Acoustic media and mean flow are currently uniform and steady; the implementation requires `|M| < 1`.
 - Acoustic absorption is a local first-order condition, not a PML; general frequency-dependent impedance and frequency-domain Helmholtz solves are not implemented.
+- Neutronics is limited to steady isotropic-scattering multigroup calculations. Transient precursors, anisotropic scattering, high-order \(S_N\) fluxes, curvilinear angular redistribution, non-orthogonal diffusion correction, DSA, adjoint/kinetic-parameter evaluation, and MPI are not implemented. Reflective \(S_N\) boundaries currently require x/y-aligned patches and an exactly paired product quadrature.
 - No convection limiter, so central reconstruction can produce oscillations in strongly convection-dominated or poor-quality-mesh cases.
 - No curved/high-order Gmsh element support.
 - No binary Gmsh input or binary Tecplot output.
@@ -1063,6 +1196,8 @@ public:
 - [ ] Add Maxwell–Stefan diffusion, species energy, and reaction-source interfaces.
 - [ ] Implement the two-dimensional elastic solid solver, including displacement, stress, traction, and fixed-displacement boundaries.
 - [x] Implement the two-dimensional acoustic solver with nodal pressure and dual-control-volume fluxes.
+- [x] Implement steady multigroup \(S_N\) transport and diffusion with \(k_{\mathrm{eff}}\), power, and conservation diagnostics.
+- [ ] Add transient neutron kinetics, delayed precursors, anisotropic scattering, adjoint quantities, and high-order/accelerated transport.
 - [x] Add configuration-driven physics selection in `main.cpp`.
 - [ ] Design shared field registration and solver scheduling for coupled calculations.
 - [ ] Add conservative field/force interpolation between different physics meshes.

@@ -12,6 +12,7 @@
 #include "fvm/TimeDerivative.hpp"
 #include "material/MaterialModel.hpp"
 
+#include <array>
 #include <filesystem>
 #include <memory>
 #include <vector>
@@ -71,7 +72,7 @@ private:
     void updateMaterialProperties();
     double faceDensity(std::size_t faceIndex) const;
     void computeMassFlux(bool rhieChow);
-    LinearSolveInfo solveMomentum(double dt);
+    std::array<LinearSolveInfo, 2> solveMomentum(double dt);
     LinearSolveInfo correctPressure(double dt);
     std::vector<double> cellImbalance() const;
     double netBoundaryFlux() const;
