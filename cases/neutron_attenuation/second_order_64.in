@@ -1,0 +1,33 @@
+physics = neutron
+neutron_model = sn
+problem_type = fixed_source
+mesh = mesh/quad_64.msh
+output = results/attenuation_ho_64.plt
+
+energy_groups = 1
+materials = absorber
+sn_polar = 2
+sn_azimuth = 4
+sn_scheme = second_order
+sn_limiter = venkatakrishnan
+initial_flux = 0.0
+maximum_iterations = 10
+maximum_source_iterations = 80
+tolerance = 1.0e-11
+source_tolerance = 1.0e-12
+balance_tolerance = 1.0e-9
+linear_tolerance = 1.0e-12
+linear_absolute_tolerance = 1.0e-14
+
+[material.absorber]
+sigma_total = 1.0
+sigma_absorption = 1.0
+
+[boundary.left]
+neutron = incident_flux 1.0
+[boundary.right]
+neutron = vacuum
+[boundary.bottom]
+neutron = reflective
+[boundary.top]
+neutron = reflective

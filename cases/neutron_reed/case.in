@@ -1,0 +1,76 @@
+physics = neutron
+neutron_model = sn
+problem_type = fixed_source
+mesh = mesh/reed_160.msh
+output = results/reed_s8_dsa.plt
+
+energy_groups = 1
+sn_order = 8
+sn_quadrature = level_symmetric
+sn_scheme = upwind
+sn_acceleration = dsa
+materials = src_abs absorber void src_scat scatterer
+default_material = scatterer
+regions = r1 r2 r3 r4 r5
+
+initial_flux = 0.0
+maximum_iterations = 10
+maximum_source_iterations = 500
+tolerance = 1.0e-10
+source_tolerance = 1.0e-11
+balance_tolerance = 1.0e-9
+linear_solver = preonly
+preconditioner = lu
+
+[material.src_abs]
+sigma_total = 50.0
+sigma_absorption = 50.0
+external_source = 50.0
+
+[material.absorber]
+sigma_total = 5.0
+sigma_absorption = 5.0
+
+[material.void]
+sigma_total = 0.0
+sigma_absorption = 0.0
+
+[material.src_scat]
+sigma_total = 1.0
+sigma_absorption = 0.1
+scattering = 0.9
+external_source = 1.0
+
+[material.scatterer]
+sigma_total = 1.0
+sigma_absorption = 0.1
+scattering = 0.9
+
+[region.r1]
+material = src_abs
+bounds = 0.0 2.0 0.0 1.0
+
+[region.r2]
+material = absorber
+bounds = 2.0 3.0 0.0 1.0
+
+[region.r3]
+material = void
+bounds = 3.0 5.0 0.0 1.0
+
+[region.r4]
+material = src_scat
+bounds = 5.0 6.0 0.0 1.0
+
+[region.r5]
+material = scatterer
+bounds = 6.0 8.0 0.0 1.0
+
+[boundary.left]
+neutron = reflective
+[boundary.right]
+neutron = vacuum
+[boundary.bottom]
+neutron = reflective
+[boundary.top]
+neutron = reflective

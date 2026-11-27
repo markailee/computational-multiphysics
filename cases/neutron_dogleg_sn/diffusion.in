@@ -1,0 +1,55 @@
+physics = neutron
+neutron_model = diffusion
+problem_type = fixed_source
+mesh = mesh/dogleg_40.msh
+output = results/dogleg_diffusion.plt
+
+energy_groups = 1
+materials = shield source void
+default_material = shield
+regions = src_zone leg1 leg2 leg3
+
+initial_flux = 0.0
+maximum_iterations = 20
+tolerance = 1.0e-10
+balance_tolerance = 1.0e-9
+linear_solver = preonly
+preconditioner = lu
+
+[material.shield]
+sigma_total = 0.1
+sigma_absorption = 0.05
+scattering = 0.05
+
+[material.source]
+sigma_total = 0.1
+sigma_absorption = 0.05
+scattering = 0.05
+external_source = 1.0
+
+[material.void]
+sigma_total = 1.0e-4
+sigma_absorption = 0.5e-4
+scattering = 0.5e-4
+
+[region.src_zone]
+material = source
+bounds = 0.0 2.0 0.0 2.0
+[region.leg1]
+material = void
+bounds = 2.0 7.0 0.0 2.0
+[region.leg2]
+material = void
+bounds = 5.0 7.0 2.0 8.0
+[region.leg3]
+material = void
+bounds = 5.0 10.0 6.0 8.0
+
+[boundary.left]
+neutron = zero_current
+[boundary.bottom]
+neutron = zero_current
+[boundary.right]
+neutron = vacuum
+[boundary.top]
+neutron = vacuum

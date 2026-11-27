@@ -103,7 +103,7 @@ $$
 \tag{5.271}
 $$
 
-这里已假定裂变中子方向各向同性。若保留时间项，只需在左端加入 $v_g^{-1}\partial\psi_{g,m}/\partial t$，并恢复式（5.270）的缓发源。$S_N$ 角度求积应准确积分足够阶数的多项式，并与散射矩展开和反射方向相匹配。柱坐标和球坐标中的方向会随空间位置改变，还会出现角度再分布项，不能直接照搬上述直角坐标形式。
+这里已假定裂变中子方向各向同性。需要区分微分散射截面 $\Sigma_{s,g'\to g}(\boldsymbol\Omega'\to\boldsymbol\Omega)$（单位 $\mathrm{cm^{-1}\,sr^{-1}}$）与角矩展开系数 $\Sigma_{s,\ell,g'\to g}$（单位 $\mathrm{cm^{-1}}$）：在各向同性（$P_0$）散射下 $\Sigma_{s,g'\to g}(\boldsymbol\Omega'\to\boldsymbol\Omega)=\Sigma_{s,0,g'\to g}/(4\pi)$；保留线性各向异性（$P_1$）散射时，散射核为 $\frac{1}{4\pi}[\Sigma_{s,0,g'\to g}+3\Sigma_{s,1,g'\to g}(\boldsymbol\Omega'\cdot\boldsymbol\Omega)]$，相应右端散射源积分为 $\frac{1}{4\pi}\sum_{g'}[\Sigma_{s,0,g'\to g}\phi_{g'}+3\Sigma_{s,1,g'\to g}\boldsymbol\Omega_m\cdot\mathbf J_{g'}]$。若保留时间项，只需在左端加入 $v_g^{-1}\partial\psi_{g,m}/\partial t$，并恢复式（5.270）的缓发源。$S_N$ 角度求积应准确积分足够阶数的多项式，并与散射矩展开和反射方向相匹配。柱坐标和球坐标中的方向会随空间位置改变，还会出现角度再分布项，不能直接照搬上述直角坐标形式。
 
 对于无独立外源的临界问题，$Q_{g,m}=0$，$k_{\mathrm{eff}}$ 是为使基波解保持稳态而引入的裂变源缩放因子。$k_{\mathrm{eff}}>1$、$=1$ 和 $<1$ 分别对应超临界、临界和次临界。这里的 $1/k_{\mathrm{eff}}$ 是**本征值问题的数学构造**，不是瞬态计算中每一步都要对真实裂变截面施加的物理修正。
 
@@ -141,12 +141,12 @@ $$
 +\nabla\cdot\mathbf J+\Sigma_t\phi=S_0,
 \qquad
 \frac1v\frac{\partial\mathbf J}{\partial t}
-+\frac13\nabla\phi+\Sigma_{\mathrm{tr}}\mathbf J=\mathbf S_1
++\frac13\nabla\phi+\Sigma_{\mathrm{tr}}\mathbf J=\mathbf Q_1
 }.
 \tag{5.274}
 $$
 
-$S_0$ 包含散射、裂变和外源的零阶矩，$\mathbf S_1$ 是相应的一阶源矩。若一阶中子流比通量更快达到准稳态，可忽略 $v^{-1}\partial\mathbf J/\partial t$，并在线性各向异性散射、各向同性源条件下得到 Fick 定律：
+$S_0$ 包含散射、裂变和外源的零阶矩；一阶方程已将本群一阶散射矩 $\Sigma_{s,1}\mathbf J$ 移至左端合并为输运截面 $\Sigma_{\mathrm{tr}}=\Sigma_t-\Sigma_{s,1}$，因此右端 $\mathbf Q_1$ 仅代表外源（以及多群情形下的群间一阶散射）的一阶矩，不再重复包含本群一阶散射。若一阶中子流比通量更快达到准稳态，可忽略 $v^{-1}\partial\mathbf J/\partial t$，并在线性各向异性散射、各向同性外源（$\mathbf Q_1=\mathbf 0$）条件下得到 Fick 定律：
 
 $$
 \boxed{
@@ -292,7 +292,7 @@ $$
 \tag{5.283}
 $$
 
-代入一维平衡方程 $|\mu|(\psi_{\mathrm{out}}-\psi_{\mathrm{in}})+\Sigma_t h\bar\psi=hq$，对 $\mu>0$ 可得
+代入一维平衡方程 $|\mu|(\psi_{\mathrm{out}}-\psi_{\mathrm{in}})+\Sigma_t h\bar\psi=hq$，对任意 $\mu\ne0$（$\psi_{\mathrm{in}}$ 与 $\psi_{\mathrm{out}}$ 按飞行方向定义）可得
 
 $$
 \boxed{
@@ -364,7 +364,7 @@ b_{g,P}&=\frac{V_P}{v_g\Delta t}\phi_{g,P}^{n}
 \tag{5.288}
 $$
 
-$G^{\mathrm{ext}}$ 和 $b^{\mathrm{ext}}$ 分别来自外边界的对角项和源项。群源可以写成
+$G^{\mathrm{ext}}$ 和 $b^{\mathrm{ext}}$ 分别来自外边界的对角项和源项，上式中的 $\sum_f G_{g,f}$ 仅对单元 $P$ 的内部界面求和。群源可以写成
 
 $$
 \boxed{
@@ -510,7 +510,7 @@ $$
 
 因此只需在式（5.288）的 $G^{\mathrm{ext}}_{g,P}$ 中加入 $A_bG_b$。真空 Marshak 条件取 $\gamma=1/2$，理想反射取 $\gamma=0$。若直接给定 Dirichlet 值 $\phi_b=\bar\phi_b$，则边界对 $a_P$ 的贡献为 $A_bD_P/d_{Pb}$，右端增加 $A_bD_P\bar\phi_b/d_{Pb}$。
 
-若 Marshak 边界给定独立入射部分电流 $\bar J^-$，由式（5.294）有 $J_n=\phi_b/2-\bar J^-$。与两点扩散通量联立得
+若 Marshak 边界给定独立入射部分电流 $\bar J^-$，由式（5.294）的 $J^-=\phi_b/4-J_n/2$ 可得 $J_n=\phi_b/2-2\bar J^-$。与两点扩散通量 $J_n=\frac{D_P}{d_{Pb}}(\phi_P-\phi_b)$ 联立消去边界通量 $\phi_b=\dfrac{2D_P\phi_P+4d_{Pb}\bar J^-}{2D_P+d_{Pb}}$，得
 
 $$
 \boxed{
@@ -518,12 +518,12 @@ J_n=G_b\phi_P-H_b\bar J^-,
 \qquad
 G_b=\frac{D_P}{2D_P+d_{Pb}},
 \qquad
-H_b=\frac{2D_P}{2D_P+d_{Pb}}
+H_b=\frac{4D_P}{2D_P+d_{Pb}}
 },
 \tag{5.297}
 $$
 
-这里 $D_P$ 的量纲为长度，$G_b$ 和 $H_b$ 均无量纲，而 $\bar J^-$ 与 $J_n$ 的量纲相同。代入式（5.288）时，$A_bG_b$ 进入 $G^{\mathrm{ext}}_{g,P}$；把 $J_n$ 留在控制体平衡左端时，独立入射源使右端增加 $A_bH_b\bar J^-$。一般 Robin 入射模型应重新推导相应系数，不能不加区分地沿用这组 Marshak 系数。
+这里 $D_P$ 的量纲为长度，$G_b$ 和 $H_b$ 均无量纲，而 $\bar J^-$ 与 $J_n$ 的量纲相同；作为自洽检验，当内部为均匀各向同性通量 $\phi_P=\phi_0$ 且边界给定对应入射流 $\bar J^-=\phi_0/4$ 时，上式严格给出 $J_n=0$。代入式（5.288）时，$A_bG_b$ 进入 $G^{\mathrm{ext}}_{g,P}$；把 $J_n$ 留在控制体平衡左端时，独立入射源使右端增加 $A_bH_b\bar J^-$。一般 Robin 入射模型应重新推导相应系数，不能不加区分地沿用这组 Marshak 系数。
 
 材料内部界面则要求标量通量和法向净流连续，式（5.287）已经自动实现这两点。若采用非匹配网格、间断有限元或不同物理模型耦合，应通过共同界面通量或 mortar 条件保证守恒。扩散—输运耦合界面还需要保持角矩或部分电流的一致映射，不能把标量通量相等当作唯一条件。
 
@@ -621,7 +621,7 @@ $$
 
 其中 $\widetilde{\mathbf x}$ 是同一规则归一化后的通量。只看 $k$ 的稳定并不充分：在优势比接近 1 时，$k$ 可能先趋于稳定，而裂变源空间分布仍在缓慢漂移。应同时检查本征残差和通量/功率分布。
 
-若 $\mathsf A^{-1}\mathsf F$ 的最大两个特征值模满足 $|\lambda_1|>|\lambda_2|$，幂迭代误差渐近按 $|\lambda_2/\lambda_1|^l$ 衰减。该比值称为优势比，越接近 1 收敛越慢。可采用 Chebyshev 加速、Wielandt 移位、Anderson 加速、Krylov 子空间本征求解器或 Jacobian-free Newton–Krylov，但必须保持基波正通量和全局裂变平衡。
+若 $\mathsf A^{-1}\mathsf F$ 的最大两个特征值模满足 $|\lambda_1|>|\lambda_2|$，幂迭代误差渐近按 $|\lambda_2/\lambda_1|^l$ 衰减。该比值称为优势比（$\mathrm{DR}=|k_1/k_0|$），越接近 1 收敛越慢，同时也反映大型堆芯出现空间功率倾斜或氙振荡的敏感性。可采用 Chebyshev 加速、Wielandt 移位、Anderson 加速、Krylov/Arnoldi 子空间本征求解器或 Jacobian-free Newton–Krylov；其中 Arnoldi 或子空间迭代还能同时求出高阶空间本征模态 $(k_m,\boldsymbol\Phi_m)$，直接给出优势比与高阶谐波分布，实现时需保证基波正通量和全局裂变平衡。
 
 ### 5.28.4 扩散合成加速与一致离散
 
@@ -663,12 +663,12 @@ $$
 \boxed{
 \left(\frac1{\Delta t}+\lambda_i\right)\mathbf C_i^{n+1}
 =\frac1{\Delta t}\mathbf C_i^n
-+\mathsf F_{d,i}\boldsymbol\Phi^{n+1}
++\mathsf P_{d,i}\boldsymbol\Phi^{n+1}
 }.
 \tag{5.305}
 $$
 
-可把 $\mathbf C_i^{n+1}$ 消元代入式（5.304），得到带历史源和附加对角项的通量系统；也可在每个时间步内进行通量—先驱核耦合迭代。初始稳态应满足 $\mathbf C_i=\mathsf F_{d,i}\boldsymbol\Phi/\lambda_i$，否则会在无扰动时产生人为瞬态。
+其中 $\mathsf P_{d,i}$ 将各能群通量映射为单元内第 $i$ 组先驱核产生率 $\sum_{g'}\beta_i\nu\Sigma_{f,g'}\phi_{g'}$（与第5.29.3节中已乘以缓发谱 $\chi_{d,i}$ 和单元体积的缓发裂变源算子 $\mathsf F_{d,i}$ 区分）。可把 $\mathbf C_i^{n+1}$ 消元代入式（5.304），得到带历史源和附加对角项的通量系统；也可在每个时间步内进行通量—先驱核耦合迭代。初始稳态应满足 $\mathbf C_i=\mathsf P_{d,i}\boldsymbol\Phi/\lambda_i$，否则会在无扰动时产生人为瞬态。
 
 隐式格式稳定并不意味着大步长准确。快速反应性插入、控制棒移动和反馈变化需要总功率、峰值功率和先驱核浓度的时间步收敛试验。Crank–Nicolson、二阶后差或指数时间积分可提高精度，但应分别检查振荡、非负性和刚性源处理。完整空间—时间求解与点堆/改进准静态近似也不能混用同一组动力学参数而不核对定义。
 

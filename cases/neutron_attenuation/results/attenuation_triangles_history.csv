@@ -1,3 +1,2 @@
-iteration,k_eff,flux_change,balance_relative,source_iterations,linear_iterations,linear_residual
-1,,1.058162917824422,1.990965884199285e-15,2,34,1.244352298449204e-14
-2,,0,1.990965884199285e-15,1,0,1.244352298449204e-14
+iteration,k_eff,flux_change,eigen_residual,balance_relative,source_iterations,linear_iterations,linear_residual
+1,,1,0,1.660715214244534e-16,6,0,0

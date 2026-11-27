@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="500" viewBox="0 0 900 500">
+<rect width="100%" height="100%" fill="white"/>
+<text x="450.0" y="28" text-anchor="middle" font-family="sans-serif" font-size="18" font-weight="600">2D dog-leg void-channel shielding along exit duct (y = 7 cm)</text>
+<line x1="85.00" y1="55" x2="85.00" y2="435" stroke="#e5e5e5"/>
+<line x1="85" y1="435.00" x2="870" y2="435.00" stroke="#e5e5e5"/>
+<text x="85.00" y="455" text-anchor="middle" font-family="sans-serif" font-size="11">0.125</text>
+<text x="77" y="439.00" text-anchor="end" font-family="sans-serif" font-size="11">0.16</text>
+<line x1="242.00" y1="55" x2="242.00" y2="435" stroke="#e5e5e5"/>
+<line x1="85" y1="359.00" x2="870" y2="359.00" stroke="#e5e5e5"/>
+<text x="242.00" y="455" text-anchor="middle" font-family="sans-serif" font-size="11">2.08</text>
+<text x="77" y="363.00" text-anchor="end" font-family="sans-serif" font-size="11">0.207</text>
+<line x1="399.00" y1="55" x2="399.00" y2="435" stroke="#e5e5e5"/>
+<line x1="85" y1="283.00" x2="870" y2="283.00" stroke="#e5e5e5"/>
+<text x="399.00" y="455" text-anchor="middle" font-family="sans-serif" font-size="11">4.03</text>
+<text x="77" y="287.00" text-anchor="end" font-family="sans-serif" font-size="11">0.253</text>
+<line x1="556.00" y1="55" x2="556.00" y2="435" stroke="#e5e5e5"/>
+<line x1="85" y1="207.00" x2="870" y2="207.00" stroke="#e5e5e5"/>
+<text x="556.00" y="455" text-anchor="middle" font-family="sans-serif" font-size="11">5.97</text>
+<text x="77" y="211.00" text-anchor="end" font-family="sans-serif" font-size="11">0.3</text>
+<line x1="713.00" y1="55" x2="713.00" y2="435" stroke="#e5e5e5"/>
+<line x1="85" y1="131.00" x2="870" y2="131.00" stroke="#e5e5e5"/>
+<text x="713.00" y="455" text-anchor="middle" font-family="sans-serif" font-size="11">7.92</text>
+<text x="77" y="135.00" text-anchor="end" font-family="sans-serif" font-size="11">0.347</text>
+<line x1="870.00" y1="55" x2="870.00" y2="435" stroke="#e5e5e5"/>
+<line x1="85" y1="55.00" x2="870" y2="55.00" stroke="#e5e5e5"/>
+<text x="870.00" y="455" text-anchor="middle" font-family="sans-serif" font-size="11">9.88</text>
+<text x="77" y="59.00" text-anchor="end" font-family="sans-serif" font-size="11">0.393</text>
+<rect x="85" y="55" width="785" height="380" fill="none" stroke="#333"/>
+<polyline points="85.00,360.89 105.13,353.80 125.26,340.21 145.38,321.30 165.51,298.71 185.64,274.33 205.77,249.96 225.90,226.90 246.03,205.85 266.15,187.13 286.28,171.16 306.41,158.68 326.54,150.70 346.67,148.16 366.79,151.60 386.92,160.93 407.05,175.44 427.18,193.93 447.31,214.98 467.44,237.19 487.56,238.45 507.69,235.51 527.82,231.40 547.95,225.70 568.08,218.37 588.21,209.67 608.33,200.12 628.46,190.39 648.59,182.87 668.72,179.61 688.85,181.45 708.97,188.60 729.10,200.53 749.23,216.37 769.36,235.10 789.49,255.70 809.62,277.23 829.74,298.81 849.87,319.66 870.00,339.11" fill="none" stroke="#7570b3" stroke-width="2.0"/>
+<polyline points="85.00,179.71 105.13,185.16 125.26,194.31 145.38,204.16 165.51,211.33 185.64,213.27 205.77,209.29 225.90,200.73 246.03,190.66 266.15,182.78 286.28,180.15 306.41,184.46 326.54,195.95 346.67,213.28 366.79,234.18 386.92,256.20 407.05,277.35 427.18,296.32 447.31,312.57 467.44,326.13 487.56,321.54 507.69,312.62 527.82,302.83 547.95,292.50 568.08,282.02 588.21,271.79 608.33,262.25 628.46,253.83 648.59,248.09 668.72,246.57 688.85,249.71 708.97,257.50 729.10,269.33 749.23,284.37 769.36,301.76 789.49,320.70 809.62,340.47 829.74,360.47 849.87,380.14 870.00,398.92" fill="none" stroke="#d95f02" stroke-width="2.0"/>
+<polyline points="85.00,138.62 105.13,139.03 125.26,140.45 145.38,144.21 165.51,152.12 185.64,164.96 205.77,179.91 225.90,189.48 246.03,195.35 266.15,204.26 286.28,220.71 306.41,237.45 326.54,251.12 346.67,262.02 366.79,271.84 386.92,281.93 407.05,292.86 427.18,304.61 447.31,316.98 467.44,329.88 487.56,329.00 507.69,324.50 527.82,320.72 547.95,317.47 568.08,314.66 588.21,312.31 608.33,310.64 628.46,309.99 648.59,310.14 668.72,312.43 688.85,317.00 708.97,323.74 729.10,332.19 749.23,341.87 769.36,352.37 789.49,363.37 809.62,374.66 829.74,386.09 849.87,397.53 870.00,408.79" fill="none" stroke="#1764ab" stroke-width="2.0"/>
+<polyline points="85.00,193.58 105.13,193.34 125.26,192.84 145.38,192.07 165.51,190.98 185.64,189.54 205.77,187.69 225.90,185.36 246.03,182.48 266.15,178.98 286.28,174.77 306.41,169.76 326.54,163.85 346.67,156.93 366.79,148.89 386.92,139.62 407.05,129.02 427.18,117.00 447.31,103.60 467.44,88.96 487.56,81.21 507.69,81.21 527.82,81.21 547.95,81.23 568.08,81.26 588.21,81.30 608.33,81.35 628.46,81.42 648.59,81.50 668.72,81.59 688.85,81.68 708.97,81.76 729.10,81.84 749.23,81.92 769.36,81.99 789.49,82.05 809.62,82.11 829.74,82.16 849.87,82.20 870.00,82.24" fill="none" stroke="#c43c39" stroke-width="2.0" stroke-dasharray="6 4"/>
+<text x="450.0" y="485" text-anchor="middle" font-family="sans-serif" font-size="14">x (cm)</text>
+<text x="20" y="250.0" text-anchor="middle" transform="rotate(-90 20 250.0)" font-family="sans-serif" font-size="14">scalar flux</text>
+<rect x="635" y="63" width="235" height="102" fill="white" fill-opacity="0.88" stroke="#ccc" rx="4"/>
+<line x1="645" y1="79" x2="673" y2="79" stroke="#7570b3" stroke-width="2.2"/>
+<text x="680" y="83" font-family="sans-serif" font-size="12">S4 (12 dirs)</text>
+<line x1="645" y1="101" x2="673" y2="101" stroke="#d95f02" stroke-width="2.2"/>
+<text x="680" y="105" font-family="sans-serif" font-size="12">S8 (40 dirs)</text>
+<line x1="645" y1="123" x2="673" y2="123" stroke="#1764ab" stroke-width="2.2"/>
+<text x="680" y="127" font-family="sans-serif" font-size="12">Product P8xA32 (128 dirs)</text>
+<line x1="645" y1="145" x2="673" y2="145" stroke="#c43c39" stroke-width="2.2" stroke-dasharray="6 4"/>
+<text x="680" y="149" font-family="sans-serif" font-size="12">Diffusion (breaks in void)</text>
+</svg>

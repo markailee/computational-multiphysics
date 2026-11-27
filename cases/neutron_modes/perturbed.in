@@ -1,0 +1,51 @@
+physics = neutron
+neutron_model = diffusion
+problem_type = eigenvalue
+mesh = mesh/quad_32.msh
+output = results/modes_perturbed.plt
+
+energy_groups = 2
+materials = fuel fuel_pert
+regions = center
+default_material = fuel
+
+initial_flux = 1.0
+maximum_iterations = 100
+tolerance = 1.0e-11
+eigen_tolerance = 1.0e-12
+balance_tolerance = 1.0e-9
+linear_solver = preonly
+preconditioner = lu
+
+[material.fuel]
+sigma_total = 1.2 2.0
+sigma_absorption = 1.0 2.0
+sigma_fission = 0.5 1.0
+nu = 16.0 40.0
+chi = 0.8 0.2
+scattering = 0.0 0.0 0.2 0.0
+diffusion_coefficient = 1.0 0.5
+energy_release = 2.0 2.0
+
+[material.fuel_pert]
+sigma_total = 1.2 2.01
+sigma_absorption = 1.0 2.01
+sigma_fission = 0.5 1.0
+nu = 16.0 40.0
+chi = 0.8 0.2
+scattering = 0.0 0.0 0.2 0.0
+diffusion_coefficient = 1.0 0.5
+energy_release = 2.0 2.0
+
+[region.center]
+material = fuel_pert
+bounds = 0.25 0.75 0.25 0.75
+
+[boundary.left]
+neutron = fixed_flux 0.0
+[boundary.right]
+neutron = fixed_flux 0.0
+[boundary.bottom]
+neutron = fixed_flux 0.0
+[boundary.top]
+neutron = fixed_flux 0.0

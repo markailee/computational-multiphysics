@@ -1,0 +1,84 @@
+physics = neutron
+neutron_model = sn
+problem_type = eigenvalue
+mesh = mesh/lattice_32.msh
+output = results/lattice_s8.plt
+
+energy_groups = 2
+sn_order = 8
+sn_quadrature = level_symmetric
+sn_scheme = upwind
+sn_acceleration = dsa
+materials = moderator uo2 mox poison
+default_material = moderator
+regions = pin_uo2_1 pin_uo2_2 pin_mox pin_poison
+
+eigen_modes = 3
+mode_tolerance = 1.0e-7
+maximum_mode_iterations = 80
+compute_adjoint = true
+
+neutron_velocity = 1.0e7 2.2e5
+delayed_beta = 0.0065
+delayed_lambda = 0.08
+delayed_chi = 1.0 0.0
+
+initial_flux = 1.0
+maximum_iterations = 200
+maximum_source_iterations = 200
+tolerance = 1.0e-9
+eigen_tolerance = 1.0e-10
+source_tolerance = 1.0e-10
+balance_tolerance = 1.0e-8
+log_interval = 10
+linear_solver = preonly
+preconditioner = lu
+
+[material.uo2]
+sigma_total = 0.55 1.15
+sigma_absorption = 0.025 0.32
+scattering = 0.505 0.0 0.020 0.83
+nu_sigma_fission = 0.015 0.54
+kappa_sigma_fission = 0.015 0.54
+chi = 1.0 0.0
+
+[material.mox]
+sigma_total = 0.58 1.45
+sigma_absorption = 0.032 0.58
+scattering = 0.528 0.0 0.020 0.87
+nu_sigma_fission = 0.022 0.86
+kappa_sigma_fission = 0.022 0.86
+chi = 1.0 0.0
+
+[material.poison]
+sigma_total = 0.60 2.80
+sigma_absorption = 0.080 2.10
+scattering = 0.500 0.0 0.020 0.70
+
+[material.moderator]
+sigma_total = 0.65 1.85
+sigma_absorption = 0.001 0.022
+scattering = 0.609 0.0 0.040 1.828
+
+# 2x2 heterogeneous mini-assembly (pitch = 1.26 cm)
+[region.pin_uo2_1]
+material = uo2
+circle = 0.63 0.63 0.41
+[region.pin_mox]
+material = mox
+circle = 1.89 0.63 0.41
+[region.pin_uo2_2]
+material = uo2
+circle = 1.89 1.89 0.41
+[region.pin_poison]
+material = poison
+circle = 0.63 1.89 0.41
+
+[boundary.left]
+neutron = reflective
+[boundary.right]
+neutron = reflective
+[boundary.bottom]
+neutron = reflective
+[boundary.top]
+neutron = reflective

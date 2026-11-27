@@ -8,6 +8,7 @@ energy_groups = 1
 materials = medium
 sn_polar = 2
 sn_azimuth = 4
+compute_adjoint = true
 initial_flux = 1.0
 maximum_iterations = 100
 maximum_source_iterations = 100

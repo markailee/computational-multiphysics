@@ -1,0 +1,28 @@
+physics = neutron
+neutron_model = diffusion
+problem_type = fixed_source
+mesh = mesh/quad_32.msh
+output = results/incident_current.plt
+
+energy_groups = 1
+materials = absorber
+initial_flux = 1.0
+maximum_iterations = 20
+tolerance = 1.0e-11
+balance_tolerance = 1.0e-9
+linear_tolerance = 1.0e-12
+linear_absolute_tolerance = 1.0e-14
+
+[material.absorber]
+sigma_total = 1.0
+sigma_absorption = 1.0
+diffusion_coefficient = 1.0
+
+[boundary.left]
+neutron = incident_current 0.5
+[boundary.right]
+neutron = vacuum
+[boundary.bottom]
+neutron = zero_current
+[boundary.top]
+neutron = zero_current

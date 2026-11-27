@@ -78,6 +78,7 @@ LinearSolveInfo PetscLinearSystem::solve(const std::vector<double>& rightHandSid
     check(VecAssemblyBegin(solution_));
     check(VecAssemblyEnd(solution_));
     check(KSPSetType(ksp_, solver.c_str()));
+    check(KSPSetInitialGuessNonzero(ksp_, solver == "preonly" ? PETSC_FALSE : PETSC_TRUE));
     PC preconditionerObject = nullptr;
     check(KSPGetPC(ksp_, &preconditionerObject));
     check(PCSetType(preconditionerObject, preconditioner.c_str()));

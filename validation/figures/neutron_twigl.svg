@@ -1,0 +1,52 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="500" viewBox="0 0 900 500">
+<rect width="100%" height="100%" fill="white"/>
+<text x="450.0" y="28" text-anchor="middle" font-family="sans-serif" font-size="18" font-weight="600">TWIGL 2D seed-blanket space-time kinetics transient</text>
+<line x1="85.00" y1="55" x2="85.00" y2="435" stroke="#e5e5e5"/>
+<line x1="85" y1="435.00" x2="870" y2="435.00" stroke="#e5e5e5"/>
+<text x="85.00" y="455" text-anchor="middle" font-family="sans-serif" font-size="11">0</text>
+<text x="77" y="439.00" text-anchor="end" font-family="sans-serif" font-size="11">0.91</text>
+<line x1="242.00" y1="55" x2="242.00" y2="435" stroke="#e5e5e5"/>
+<line x1="85" y1="359.00" x2="870" y2="359.00" stroke="#e5e5e5"/>
+<text x="242.00" y="455" text-anchor="middle" font-family="sans-serif" font-size="11">0.1</text>
+<text x="77" y="363.00" text-anchor="end" font-family="sans-serif" font-size="11">1.17</text>
+<line x1="399.00" y1="55" x2="399.00" y2="435" stroke="#e5e5e5"/>
+<line x1="85" y1="283.00" x2="870" y2="283.00" stroke="#e5e5e5"/>
+<text x="399.00" y="455" text-anchor="middle" font-family="sans-serif" font-size="11">0.2</text>
+<text x="77" y="287.00" text-anchor="end" font-family="sans-serif" font-size="11">1.43</text>
+<line x1="556.00" y1="55" x2="556.00" y2="435" stroke="#e5e5e5"/>
+<line x1="85" y1="207.00" x2="870" y2="207.00" stroke="#e5e5e5"/>
+<text x="556.00" y="455" text-anchor="middle" font-family="sans-serif" font-size="11">0.3</text>
+<text x="77" y="211.00" text-anchor="end" font-family="sans-serif" font-size="11">1.7</text>
+<line x1="713.00" y1="55" x2="713.00" y2="435" stroke="#e5e5e5"/>
+<line x1="85" y1="131.00" x2="870" y2="131.00" stroke="#e5e5e5"/>
+<text x="713.00" y="455" text-anchor="middle" font-family="sans-serif" font-size="11">0.4</text>
+<text x="77" y="135.00" text-anchor="end" font-family="sans-serif" font-size="11">1.96</text>
+<line x1="870.00" y1="55" x2="870.00" y2="435" stroke="#e5e5e5"/>
+<line x1="85" y1="55.00" x2="870" y2="55.00" stroke="#e5e5e5"/>
+<text x="870.00" y="455" text-anchor="middle" font-family="sans-serif" font-size="11">0.5</text>
+<text x="77" y="59.00" text-anchor="end" font-family="sans-serif" font-size="11">2.22</text>
+<rect x="85" y="55" width="785" height="380" fill="none" stroke="#333"/>
+<polyline points="85.00,408.79 100.70,229.48 116.40,156.31 132.10,125.90 147.80,113.08 163.50,107.52 179.20,104.93 194.90,103.58 210.60,102.73 226.30,102.09 242.00,101.53 257.70,101.01 273.40,100.50 289.10,100.00 304.80,99.50 320.50,99.00 336.20,98.50 351.90,98.00 367.60,97.50 383.30,97.00 399.00,96.50 414.70,96.00 430.40,95.49 446.10,94.99 461.80,94.49 477.50,93.99 493.20,93.48 508.90,92.98 524.60,92.48 540.30,91.97 556.00,91.47 571.70,90.96 587.40,90.46 603.10,89.95 618.80,89.44 634.50,88.94 650.20,88.43 665.90,87.92 681.60,87.41 697.30,86.90 713.00,86.39 728.70,85.88 744.40,85.37 760.10,84.86 775.80,84.35 791.50,83.84 807.20,83.33 822.90,82.82 838.60,82.30 854.30,81.79 870.00,81.28" fill="none" stroke="#1764ab" stroke-width="2.0"/>
+<circle cx="242.00" cy="101.48" r="4.2" fill="#1764ab" stroke="white" stroke-width="1"/>
+<circle cx="399.00" cy="96.56" r="4.2" fill="#1764ab" stroke="white" stroke-width="1"/>
+<circle cx="556.00" cy="91.63" r="4.2" fill="#1764ab" stroke="white" stroke-width="1"/>
+<circle cx="713.00" cy="86.42" r="4.2" fill="#1764ab" stroke="white" stroke-width="1"/>
+<circle cx="870.00" cy="81.21" r="4.2" fill="#1764ab" stroke="white" stroke-width="1"/>
+<polyline points="85.00,408.79 100.70,404.76 116.40,397.66 132.10,389.83 147.80,381.51 163.50,372.70 179.20,363.35 194.90,353.41 210.60,342.83 226.30,331.55 242.00,319.49 257.70,306.59 273.40,292.73 289.10,277.83 304.80,261.75 320.50,244.36 336.20,225.50 351.90,204.98 367.60,182.58 383.30,158.03 399.00,131.02 414.70,112.65 430.40,105.52 446.10,102.55 461.80,101.14 477.50,100.30 493.20,99.68 508.90,99.13 524.60,98.62 540.30,98.11 556.00,97.61 571.70,97.11 587.40,96.61 603.10,96.11 618.80,95.60 634.50,95.10 650.20,94.60 665.90,94.10 681.60,93.59 697.30,93.09 713.00,92.59 728.70,92.08 744.40,91.58 760.10,91.07 775.80,90.57 791.50,90.06 807.20,89.55 822.90,89.05 838.60,88.54 854.30,88.03 870.00,87.52" fill="none" stroke="#c43c39" stroke-width="2.0"/>
+<circle cx="242.00" cy="319.29" r="4.2" fill="#c43c39" stroke="white" stroke-width="1"/>
+<circle cx="399.00" cy="130.74" r="4.2" fill="#c43c39" stroke="white" stroke-width="1"/>
+<circle cx="556.00" cy="97.72" r="4.2" fill="#c43c39" stroke="white" stroke-width="1"/>
+<circle cx="713.00" cy="92.50" r="4.2" fill="#c43c39" stroke="white" stroke-width="1"/>
+<circle cx="870.00" cy="87.58" r="4.2" fill="#c43c39" stroke="white" stroke-width="1"/>
+<text x="450.0" y="485" text-anchor="middle" font-family="sans-serif" font-size="14">time (s)</text>
+<text x="20" y="250.0" text-anchor="middle" transform="rotate(-90 20 250.0)" font-family="sans-serif" font-size="14">relative total power P(t)/P(0)</text>
+<rect x="635" y="63" width="235" height="102" fill="white" fill-opacity="0.88" stroke="#ccc" rx="4"/>
+<line x1="645" y1="79" x2="673" y2="79" stroke="#1764ab" stroke-width="2.2"/>
+<text x="680" y="83" font-family="sans-serif" font-size="12">Step (Backward Euler)</text>
+<circle cx="659" cy="101" r="4.2" fill="#1764ab"/>
+<text x="680" y="105" font-family="sans-serif" font-size="12">Step reference</text>
+<line x1="645" y1="123" x2="673" y2="123" stroke="#c43c39" stroke-width="2.2"/>
+<text x="680" y="127" font-family="sans-serif" font-size="12">0.2 s Ramp (Crank-Nicolson)</text>
+<circle cx="659" cy="145" r="4.2" fill="#c43c39"/>
+<text x="680" y="149" font-family="sans-serif" font-size="12">Ramp reference</text>
+</svg>

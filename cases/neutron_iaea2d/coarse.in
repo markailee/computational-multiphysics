@@ -1,0 +1,156 @@
+physics = neutron
+neutron_model = diffusion
+problem_type = eigenvalue
+mesh = mesh/iaea_5cm.msh
+output = results/iaea2d_5cm.plt
+
+energy_groups = 2
+axial_buckling = 0.8e-4
+materials = fuel1 fuel2 fuel2_rod reflector
+default_material = reflector
+
+# Quarter-core assembly layout (ANL-7416 11-A2):
+# First paint the core fuel2 footprint, then outer fuel1 ring, then the 4 control-rod zones.
+regions = f2_r0 f2_r1 f2_r2 f2_r3 f2_r4 f2_r5 f2_r6 f1_07 f1_17 f1_26 f1_27 f1_36 f1_45 f1_46 f1_54 f1_55 f1_62 f1_63 f1_64 f1_70 f1_71 f1_72 rod_00 rod_40 rod_04 rod_44
+
+eigen_modes = 4
+mode_tolerance = 1.0e-9
+maximum_mode_iterations = 150
+compute_adjoint = true
+
+neutron_velocity = 1.0e7 2.2e5
+delayed_beta = 0.00021 0.00142 0.00127 0.00257 0.00075 0.00027
+delayed_lambda = 0.0124 0.0305 0.111 0.301 1.14 3.01
+delayed_chi = 1.0 0.0
+
+perturbation_region = rod_00
+perturbation_delta_absorption = 0.0 -0.002
+
+initial_flux = 1.0
+maximum_iterations = 800
+tolerance = 1.0e-10
+eigen_tolerance = 1.0e-11
+balance_tolerance = 1.0e-9
+log_interval = 25
+linear_solver = preonly
+preconditioner = lu
+
+[material.fuel1]
+diffusion_coefficient = 1.5 0.4
+sigma_absorption = 0.010 0.080
+scattering = 0.0 0.0 0.020 0.0
+nu_sigma_fission = 0.0 0.135
+kappa_sigma_fission = 0.0 0.135
+chi = 1.0 0.0
+
+[material.fuel2]
+diffusion_coefficient = 1.5 0.4
+sigma_absorption = 0.010 0.085
+scattering = 0.0 0.0 0.020 0.0
+nu_sigma_fission = 0.0 0.135
+kappa_sigma_fission = 0.0 0.135
+chi = 1.0 0.0
+
+[material.fuel2_rod]
+diffusion_coefficient = 1.5 0.4
+sigma_absorption = 0.010 0.130
+scattering = 0.0 0.0 0.020 0.0
+nu_sigma_fission = 0.0 0.135
+kappa_sigma_fission = 0.0 0.135
+chi = 1.0 0.0
+
+[material.reflector]
+diffusion_coefficient = 2.0 0.3
+sigma_absorption = 0.0 0.010
+scattering = 0.0 0.0 0.040 0.0
+
+# Fuel2 interior rows (edges: 0, 10, 30, 50, 70, 90, 110, 130, 150, 170)
+[region.f2_r0]
+material = fuel2
+bounds = 0.0 130.0 0.0 10.0
+[region.f2_r1]
+material = fuel2
+bounds = 0.0 130.0 10.0 30.0
+[region.f2_r2]
+material = fuel2
+bounds = 0.0 110.0 30.0 50.0
+[region.f2_r3]
+material = fuel2
+bounds = 0.0 110.0 50.0 70.0
+[region.f2_r4]
+material = fuel2
+bounds = 0.0 90.0 70.0 90.0
+[region.f2_r5]
+material = fuel2
+bounds = 0.0 70.0 90.0 110.0
+[region.f2_r6]
+material = fuel2
+bounds = 0.0 30.0 110.0 130.0
+
+# Fuel1 outer ring assemblies
+[region.f1_07]
+material = fuel1
+bounds = 130.0 150.0 0.0 10.0
+[region.f1_17]
+material = fuel1
+bounds = 130.0 150.0 10.0 30.0
+[region.f1_26]
+material = fuel1
+bounds = 110.0 130.0 30.0 50.0
+[region.f1_27]
+material = fuel1
+bounds = 130.0 150.0 30.0 50.0
+[region.f1_36]
+material = fuel1
+bounds = 110.0 130.0 50.0 70.0
+[region.f1_45]
+material = fuel1
+bounds = 90.0 110.0 70.0 90.0
+[region.f1_46]
+material = fuel1
+bounds = 110.0 130.0 70.0 90.0
+[region.f1_54]
+material = fuel1
+bounds = 70.0 90.0 90.0 110.0
+[region.f1_55]
+material = fuel1
+bounds = 90.0 110.0 90.0 110.0
+[region.f1_62]
+material = fuel1
+bounds = 30.0 50.0 110.0 130.0
+[region.f1_63]
+material = fuel1
+bounds = 50.0 70.0 110.0 130.0
+[region.f1_64]
+material = fuel1
+bounds = 70.0 90.0 110.0 130.0
+[region.f1_70]
+material = fuel1
+bounds = 0.0 10.0 130.0 150.0
+[region.f1_71]
+material = fuel1
+bounds = 10.0 30.0 130.0 150.0
+[region.f1_72]
+material = fuel1
+bounds = 30.0 50.0 130.0 150.0
+
+# Rodded fuel2 assemblies
+[region.rod_00]
+material = fuel2_rod
+bounds = 0.0 10.0 0.0 10.0
+[region.rod_40]
+material = fuel2_rod
+bounds = 70.0 90.0 0.0 10.0
+[region.rod_04]
+material = fuel2_rod
+bounds = 0.0 10.0 70.0 90.0
+[region.rod_44]
+material = fuel2_rod
+bounds = 70.0 90.0 70.0 90.0
+
+[boundary.left]
+neutron = zero_current
+[boundary.bottom]
+neutron = zero_current
+[boundary.outer]
+neutron = marshak 0.4692

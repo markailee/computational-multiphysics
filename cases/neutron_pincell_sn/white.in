@@ -1,0 +1,53 @@
+physics = neutron
+neutron_model = sn
+problem_type = eigenvalue
+mesh = mesh/pincell_24.msh
+output = results/pincell_s8_white.plt
+
+energy_groups = 2
+sn_order = 8
+sn_quadrature = level_symmetric
+sn_scheme = upwind
+sn_acceleration = dsa
+materials = moderator uo2
+default_material = moderator
+regions = fuel_pin
+
+initial_flux = 1.0
+maximum_iterations = 200
+maximum_source_iterations = 200
+tolerance = 1.0e-9
+eigen_tolerance = 1.0e-10
+source_tolerance = 1.0e-10
+balance_tolerance = 1.0e-8
+log_interval = 20
+linear_solver = preonly
+preconditioner = lu
+
+[material.uo2]
+sigma_total = 0.55 1.15
+sigma_absorption = 0.025 0.32
+scattering = 0.505 0.0 0.020 0.83
+scattering_p1 = 0.10 0.0 0.0 0.12
+nu_sigma_fission = 0.015 0.54
+kappa_sigma_fission = 0.015 0.54
+chi = 1.0 0.0
+
+[material.moderator]
+sigma_total = 0.65 1.85
+sigma_absorption = 0.001 0.022
+scattering = 0.609 0.0 0.040 1.828
+scattering_p1 = 0.18 0.0 0.0 0.45
+
+[region.fuel_pin]
+material = uo2
+circle = 0.63 0.63 0.41
+
+[boundary.left]
+neutron = white_reflective
+[boundary.right]
+neutron = white_reflective
+[boundary.bottom]
+neutron = white_reflective
+[boundary.top]
+neutron = white_reflective
